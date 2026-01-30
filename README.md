@@ -26,8 +26,15 @@ npm run build
 - **src/components/Sidebar.tsx** - เมนูบาร์ด้านซ้าย (สี #4A90A4)
 - **src/components/TopBar.tsx** - แถบด้านบน (สี #FF9900)
 - **src/pages/Dashboard.tsx** - หน้า Dashboard หลัก
+- **src/pages/SupplierCommission.tsx** - หน้า Supplier Commission
 
 ## สี
 
 - Sidebar: #4A90A4
 - Top Bar: #FF9900
+
+## Features
+
+- ✅ Responsive Design
+- ✅ Mobile-friendly Sidebar
+- ✅ Auto Deploy with Vercel
