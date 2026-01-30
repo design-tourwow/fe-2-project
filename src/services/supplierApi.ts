@@ -21,11 +21,22 @@ class SupplierApiService {
 
   async getCountries(): Promise<Country[]> {
     try {
-      const response = await this.request<ApiResponse<Country[]>>('/api/countries');
-      return response.data;
+      const response = await this.request<ApiResponse<Country[]> | Country[]>('/api/countries');
+      
+      // Check if response has the expected structure
+      if (response && typeof response === 'object' && 'data' in response && Array.isArray(response.data)) {
+        return response.data;
+      } else if (Array.isArray(response)) {
+        // Handle case where API returns array directly
+        return response as Country[];
+      } else {
+        console.warn('Unexpected countries API response format:', response);
+        return [];
+      }
     } catch (error) {
       console.error('Error fetching countries:', error);
-      throw error;
+      // Return empty array instead of throwing
+      return [];
     }
   }
 
@@ -50,10 +61,20 @@ class SupplierApiService {
         `/api/reports/supplier-performance?${queryParams.toString()}`
       );
       
-      return response.data;
+      // Check if response has the expected structure
+      if (response && response.data && Array.isArray(response.data)) {
+        return response.data;
+      } else if (Array.isArray(response)) {
+        // Handle case where API returns array directly
+        return response as SupplierReportData[];
+      } else {
+        console.warn('Unexpected API response format:', response);
+        return [];
+      }
     } catch (error) {
       console.error('Error fetching supplier report:', error);
-      throw error;
+      // Return empty array instead of throwing
+      return [];
     }
   }
 }

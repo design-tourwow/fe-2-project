@@ -62,14 +62,20 @@ const SupplierCommission: React.FC = () => {
 
       const reportData = await supplierApiService.getSupplierReport(params)
       
-      // Sort by total_commission descending
-      const sortedData = reportData.sort((a, b) => 
-        b.metrics.total_commission - a.metrics.total_commission
-      )
-      
-      setData(sortedData)
+      // Check if reportData exists and is an array
+      if (reportData && Array.isArray(reportData)) {
+        // Sort by total_commission descending
+        const sortedData = reportData.sort((a, b) => 
+          b.metrics.total_commission - a.metrics.total_commission
+        )
+        setData(sortedData)
+      } else {
+        // If no data or invalid format, set empty array
+        setData([])
+      }
     } catch (err) {
       setError('เกิดข้อผิดพลาดในการโหลดข้อมูล กรุณาลองใหม่อีกครั้ง')
+      setData([]) // Set empty array on error
       console.error('Failed to load report data:', err)
     } finally {
       setLoading(false)
