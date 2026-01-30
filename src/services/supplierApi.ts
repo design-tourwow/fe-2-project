@@ -53,13 +53,14 @@ class SupplierApiService {
         queryParams.append('month', params.month.toString());
       }
       
-      if (params.country_id) {
+      if (params.country_id && params.country_id > 0) {
         queryParams.append('country_id', params.country_id.toString());
       }
 
-      const response = await this.request<ApiResponse<SupplierReportData[]>>(
-        `/api/reports/supplier-performance?${queryParams.toString()}`
-      );
+      const url = `/api/reports/supplier-performance?${queryParams.toString()}`;
+      console.log('API URL:', `${API_BASE_URL}${url}`); // Debug log
+
+      const response = await this.request<ApiResponse<SupplierReportData[]>>(url);
       
       // Check if response has the expected structure
       if (response && response.data && Array.isArray(response.data)) {

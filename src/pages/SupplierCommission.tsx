@@ -50,8 +50,12 @@ const SupplierCommission: React.FC = () => {
     
     try {
       const params: FilterParams = {
-        year: selectedYear,
-        country_id: selectedCountry
+        year: selectedYear
+      }
+
+      // Only add country_id if it's actually selected (not undefined)
+      if (selectedCountry && selectedCountry > 0) {
+        params.country_id = selectedCountry
       }
 
       if (filterMode === 'quarterly') {
@@ -59,6 +63,8 @@ const SupplierCommission: React.FC = () => {
       } else if (filterMode === 'monthly') {
         params.month = selectedMonth
       }
+
+      console.log('API Params:', params) // Debug log
 
       const reportData = await supplierApiService.getSupplierReport(params)
       
