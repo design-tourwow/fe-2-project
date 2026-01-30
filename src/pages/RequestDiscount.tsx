@@ -550,7 +550,7 @@ const RequestDiscount: React.FC = () => {
               {/* Order Details Table */}
               <div className="bg-white rounded-lg shadow overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">รายละเอียด Orders</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">รายละเอียด Orders ที่มีส่วนลด</h2>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
@@ -560,22 +560,34 @@ const RequestDiscount: React.FC = () => {
                           Order Code
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          วันที่สร้าง
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           ลูกค้า
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          เซลล์ / CRM
+                          เซลล์
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          CRM
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           ยอดสุทธิ
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          คอมมิชชั่น
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           ส่วนลด
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          % ส่วนลด
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           การชำระเงิน
                         </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          วันที่สร้าง
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          สถานะ
                         </th>
                       </tr>
                     </thead>
@@ -587,8 +599,11 @@ const RequestDiscount: React.FC = () => {
                               {order.order_info.order_code}
                             </div>
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(order.order_info.created_at)}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
+                            <div className="text-sm font-medium text-gray-900">
                               {order.customer_info.customer_name}
                             </div>
                           </td>
@@ -596,33 +611,63 @@ const RequestDiscount: React.FC = () => {
                             <div className="text-sm text-gray-900">
                               {order.sales_crm.seller_name}
                             </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-500">
-                              CRM: {order.sales_crm.crm_name}
+                              {order.sales_crm.crm_name}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-gray-900">
                             ฿{formatCurrency(order.financial_metrics.net_amount)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right">
-                            <div className="text-sm text-red-600">
-                              ฿{formatCurrency(order.financial_metrics.discount)}
-                            </div>
-                            <div className="text-sm text-orange-600">
-                              ({order.financial_metrics.discount_percent.toFixed(2)}%)
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-blue-600">
+                            ฿{formatCurrency(order.financial_metrics.supplier_commission)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-red-600">
+                            ฿{formatCurrency(order.financial_metrics.discount)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-orange-600">
+                            {order.financial_metrics.discount_percent.toFixed(2)}%
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <div className="flex flex-col items-center">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_details.status_list)}`}>
+                                {order.payment_details.paid_installments}/{order.payment_details.total_installments}
+                              </span>
+                              <div className="text-xs text-gray-500 mt-1">
+                                งวด
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPaymentStatusColor(order.payment_details.status_list)}`}>
-                              {order.payment_details.paid_installments}/{order.payment_details.total_installments}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatDate(order.order_info.created_at)}
+                            <div className="text-xs text-gray-600 max-w-32">
+                              {order.payment_details.status_list}
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+                
+                {/* Table Summary */}
+                <div className="bg-gray-50 px-6 py-3 border-t">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-600">
+                      แสดง {data.length} รายการ
+                    </span>
+                    <div className="flex space-x-6 text-gray-600">
+                      <span>
+                        ยอดสุทธิรวม: <span className="font-medium text-gray-900">฿{formatCurrency(overallMetrics.totalNetAmount)}</span>
+                      </span>
+                      <span>
+                        ส่วนลดรวม: <span className="font-medium text-red-600">฿{formatCurrency(overallMetrics.totalDiscount)}</span>
+                      </span>
+                      <span>
+                        คอมมิชชั่นรวม: <span className="font-medium text-blue-600">฿{formatCurrency(overallMetrics.totalCommission)}</span>
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </>
