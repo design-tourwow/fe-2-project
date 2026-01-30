@@ -32,7 +32,8 @@ export interface OrderDiscountParams {
 
 export interface SalesSummary {
   seller_name: string;
-  order_count: number;
+  order_count: number; // จำนวน Order ที่มีส่วนลด
+  total_orders: number; // จำนวน Order ทั้งหมด
   total_discount: number;
   avg_discount_percent: number;
   total_net_amount: number;

@@ -17,9 +17,11 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'
 
 const RequestDiscount: React.FC = () => {
   const [data, setData] = useState<OrderDiscountData[]>([])
+  const [allOrdersData, setAllOrdersData] = useState<OrderDiscountData[]>([]) // เก็บข้อมูลทั้งหมด
   const [countries, setCountries] = useState<Country[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showDiscountOnly, setShowDiscountOnly] = useState(true) // Default เป็น true
   
   // Filter states
   const [filterMode, setFilterMode] = useState<FilterMode>('quarterly')
@@ -76,18 +78,39 @@ const RequestDiscount: React.FC = () => {
         const sortedData = reportData.sort((a, b) => 
           new Date(b.order_info.created_at).getTime() - new Date(a.order_info.created_at).getTime()
         )
-        setData(sortedData)
+        
+        // เก็บข้อมูลทั้งหมด
+        setAllOrdersData(sortedData)
+        
+        // กรองข้อมูลตาม checkbox
+        const filteredData = showDiscountOnly 
+          ? sortedData.filter(order => order.financial_metrics.discount >= 1)
+          : sortedData
+        
+        setData(filteredData)
       } else {
+        setAllOrdersData([])
         setData([])
       }
     } catch (err) {
       setError('เกิดข้อผิดพลาดในการโหลดข้อมูล กรุณาลองใหม่อีกครั้ง')
+      setAllOrdersData([])
       setData([])
       console.error('Failed to load order discount data:', err)
     } finally {
       setLoading(false)
     }
   }
+
+  // เมื่อ checkbox เปลี่ยน
+  useEffect(() => {
+    if (allOrdersData.length > 0) {
+      const filteredData = showDiscountOnly 
+        ? allOrdersData.filter(order => order.financial_metrics.discount >= 1)
+        : allOrdersData
+      setData(filteredData)
+    }
+  }, [showDiscountOnly, allOrdersData])
 
   const handleFilterModeChange = (mode: FilterMode) => {
     setFilterMode(mode)
@@ -102,26 +125,32 @@ const RequestDiscount: React.FC = () => {
   const yearOptions = getYearOptions()
   const monthOptions = getMonthOptions()
 
-  // Calculate sales summary
+  // Calculate sales summary - ใช้ข้อมูลทั้งหมดในการคำนวณ
   const salesSummary: SalesSummary[] = React.useMemo(() => {
     const salesMap = new Map<string, {
-      order_count: number;
+      orders_with_discount: number;
+      total_orders: number;
       total_discount: number;
       total_discount_percent: number;
       total_net_amount: number;
     }>()
 
-    data.forEach(order => {
+    // นับ Order ทั้งหมดของแต่ละเซลล์
+    allOrdersData.forEach(order => {
       const sellerName = order.sales_crm.seller_name
       const existing = salesMap.get(sellerName) || {
-        order_count: 0,
+        orders_with_discount: 0,
+        total_orders: 0,
         total_discount: 0,
         total_discount_percent: 0,
         total_net_amount: 0
       }
 
+      const hasDiscount = order.financial_metrics.discount >= 1
+
       salesMap.set(sellerName, {
-        order_count: existing.order_count + 1,
+        orders_with_discount: existing.orders_with_discount + (hasDiscount ? 1 : 0),
+        total_orders: existing.total_orders + 1,
         total_discount: existing.total_discount + order.financial_metrics.discount,
         total_discount_percent: existing.total_discount_percent + order.financial_metrics.discount_percent,
         total_net_amount: existing.total_net_amount + order.financial_metrics.net_amount
@@ -130,12 +159,13 @@ const RequestDiscount: React.FC = () => {
 
     return Array.from(salesMap.entries()).map(([seller_name, stats]) => ({
       seller_name,
-      order_count: stats.order_count,
+      order_count: stats.orders_with_discount, // จำนวน Order ที่มีส่วนลด
+      total_orders: stats.total_orders, // จำนวน Order ทั้งหมด
       total_discount: stats.total_discount,
-      avg_discount_percent: stats.total_discount_percent / stats.order_count,
+      avg_discount_percent: stats.orders_with_discount > 0 ? stats.total_discount_percent / stats.orders_with_discount : 0,
       total_net_amount: stats.total_net_amount
-    })).sort((a, b) => b.order_count - a.order_count)
-  }, [data])
+    })).sort((a, b) => b.order_count - a.order_count) // เรียงตาม Order ที่มีส่วนลดมากที่สุด
+  }, [allOrdersData])
 
   // Calculate overall metrics
   const overallMetrics = React.useMemo(() => {
@@ -435,26 +465,27 @@ const RequestDiscount: React.FC = () => {
               {/* Sales Summary Table */}
               <div className="bg-white rounded-lg shadow overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">สรุปข้อมูลเซลล์</h2>
+                  <h2 className="text-lg font-semibold text-gray-900">Top Sales ที่ขอส่วนลดให้ลูกค้ามากที่สุด</h2>
+                  <p className="text-sm text-gray-600 mt-1">เรียงตามจำนวน Order ที่มีการขอส่วนลด</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          อันดับ
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           เซลล์
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          จำนวน Orders
+                          Order มีส่วนลด / ทั้งหมด
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          % เฉลี่ยส่วนลด
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           ส่วนลดรวม
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          เฉลี่ย %
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          ยอดสุทธิรวม
                         </th>
                       </tr>
                     </thead>
@@ -468,26 +499,28 @@ const RequestDiscount: React.FC = () => {
                               }`}>
                                 {index + 1}
                               </div>
-                              <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {sales.seller_name}
-                                </div>
-                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {sales.seller_name}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                              {sales.order_count}
-                            </span>
+                            <div className="text-sm">
+                              <span className="font-medium text-blue-600">{sales.order_count}</span>
+                              <span className="text-gray-500"> / </span>
+                              <span className="text-gray-900">{(sales as any).total_orders}</span>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              ({(sales as any).total_orders > 0 ? ((sales.order_count / (sales as any).total_orders) * 100).toFixed(1) : 0}% มีส่วนลด)
+                            </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-red-600">
-                            ฿{formatCurrency(sales.total_discount)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-orange-600">
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-orange-600 font-medium">
                             {sales.avg_discount_percent.toFixed(2)}%
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600">
-                            ฿{formatCurrency(sales.total_net_amount)}
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-red-600 font-medium">
+                            ฿{formatCurrency(sales.total_discount)}
                           </td>
                         </tr>
                       ))}
@@ -549,8 +582,26 @@ const RequestDiscount: React.FC = () => {
 
               {/* Order Details Table */}
               <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">รายละเอียด Orders ที่มีส่วนลด</h2>
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">รายละเอียด Orders</h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {showDiscountOnly ? 'แสดงเฉพาะ Order ที่มีส่วนลด ≥ ฿1' : 'แสดง Order ทั้งหมด'}
+                    </p>
+                  </div>
+                  <div className="flex items-center">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={showDiscountOnly}
+                        onChange={(e) => setShowDiscountOnly(e.target.checked)}
+                        className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">
+                        แสดงเฉพาะ Order ที่มีส่วนลด
+                      </span>
+                    </label>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
