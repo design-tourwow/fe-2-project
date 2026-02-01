@@ -337,7 +337,7 @@ const DiscountSales: React.FC = () => {
                       </svg>
                     </div>
                     <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">ยอดขายรวม</p>
+                      <p className="text-sm font-medium text-gray-600">ค่าคอมรวม</p>
                       <p className="text-2xl font-semibold text-gray-900">฿{formatCurrency(summaryMetrics.totalSales)}</p>
                     </div>
                   </div>

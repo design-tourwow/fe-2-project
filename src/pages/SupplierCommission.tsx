@@ -13,6 +13,9 @@ import {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C'];
 
+type SortField = 'avg_commission_per_pax' | 'avg_net_commission_per_pax'
+type SortDirection = 'asc' | 'desc'
+
 const SupplierCommission: React.FC = () => {
   const [data, setData] = useState<SupplierReportData[]>([])
   const [countries, setCountries] = useState<Country[]>([])
@@ -25,6 +28,10 @@ const SupplierCommission: React.FC = () => {
   const [selectedQuarter, setSelectedQuarter] = useState(getCurrentQuarter())
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedCountry, setSelectedCountry] = useState<number | undefined>(undefined)
+  
+  // Sorting states
+  const [sortField, setSortField] = useState<SortField | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   // Load countries on mount
   useEffect(() => {
@@ -70,11 +77,14 @@ const SupplierCommission: React.FC = () => {
       
       // Check if reportData exists and is an array
       if (reportData && Array.isArray(reportData)) {
-        // Sort by total_commission descending
+        // Sort by total_commission descending by default
         const sortedData = reportData.sort((a, b) => 
           b.metrics.total_commission - a.metrics.total_commission
         )
         setData(sortedData)
+        // Reset sorting when new data is loaded
+        setSortField(null)
+        setSortDirection('desc')
       } else {
         // If no data or invalid format, set empty array
         setData([])
@@ -95,6 +105,56 @@ const SupplierCommission: React.FC = () => {
       setSelectedQuarter(getCurrentQuarter())
     } else if (mode === 'monthly') {
       setSelectedMonth(new Date().getMonth() + 1)
+    }
+  }
+
+  const handleSort = (field: SortField) => {
+    let newDirection: SortDirection = 'desc'
+    
+    if (sortField === field) {
+      // If clicking the same field, toggle direction
+      newDirection = sortDirection === 'desc' ? 'asc' : 'desc'
+    }
+    
+    setSortField(field)
+    setSortDirection(newDirection)
+    
+    // Sort the data
+    const sortedData = [...data].sort((a, b) => {
+      const aValue = a.metrics[field]
+      const bValue = b.metrics[field]
+      
+      if (newDirection === 'desc') {
+        return bValue - aValue
+      } else {
+        return aValue - bValue
+      }
+    })
+    
+    setData(sortedData)
+  }
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 ml-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    
+    if (sortDirection === 'desc') {
+      return (
+        <svg className="w-4 h-4 ml-1 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        </svg>
+      )
+    } else {
+      return (
+        <svg className="w-4 h-4 ml-1 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        </svg>
+      )
     }
   }
 
@@ -339,20 +399,32 @@ const SupplierCommission: React.FC = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Supplier Name
                         </th>
-                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Pax
-                        </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Total Comm.
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Net Comm.
                         </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Avg Comm.(ต่อคน)
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          จำนวนผู้เดินทาง
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Avg Net(สุทธิต่อคน)
+                          <button
+                            onClick={() => handleSort('avg_commission_per_pax')}
+                            className="flex items-center justify-end w-full hover:text-gray-700 focus:outline-none"
+                          >
+                            Avg Comm.(ต่อคน)
+                            {getSortIcon('avg_commission_per_pax')}
+                          </button>
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <button
+                            onClick={() => handleSort('avg_net_commission_per_pax')}
+                            className="flex items-center justify-end w-full hover:text-gray-700 focus:outline-none"
+                          >
+                            Avg Net(สุทธิต่อคน)
+                            {getSortIcon('avg_net_commission_per_pax')}
+                          </button>
                         </th>
                       </tr>
                     </thead>
@@ -369,16 +441,16 @@ const SupplierCommission: React.FC = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-                              {supplier.metrics.total_pax.toLocaleString()}
-                            </span>
-                          </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
                             ฿{formatCurrency(supplier.metrics.total_commission)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-green-600">
                             ฿{formatCurrency(supplier.metrics.total_net_commission)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                              {supplier.metrics.total_pax.toLocaleString()}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-500">
                             ฿{formatCurrency(supplier.metrics.avg_commission_per_pax)}

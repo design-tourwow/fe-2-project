@@ -4,8 +4,8 @@
   "description": "ระบบรายงานและวิเคราะห์ข้อมูล Tourwow",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#FF9900",
+  "background_color": "#000000",
+  "theme_color": "#FF6600",
   "icons": [
     {
       "src": "/favicon.svg",
@@ -17,6 +17,11 @@
       "src": "/favicon.ico",
       "sizes": "32x32",
       "type": "image/x-icon"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ]
 }
