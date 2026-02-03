@@ -1,12 +1,22 @@
 import { SupplierReportData, Country, ApiResponse } from '../types/supplier';
 import { ExtendedFilterParams } from '../types/filterTypes';
+import { getAuthHeaders, handleAuthError } from '../utils/auth';
 
 const API_BASE_URL = 'https://be-2-report.vercel.app';
 
 class SupplierApiService {
   private async request<T>(endpoint: string): Promise<T> {
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`);
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'GET',
+        headers: getAuthHeaders()
+      });
+      
+      // Handle 401 Unauthorized
+      if (response.status === 401) {
+        handleAuthError();
+        throw new Error('Unauthorized access');
+      }
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
