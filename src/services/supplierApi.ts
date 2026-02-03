@@ -1,4 +1,4 @@
-import { SupplierReportData, Country, ApiResponse, FilterParams } from '../types/supplier';
+import { SupplierReportData, Country, ApiResponse } from '../types/supplier';
 import { ExtendedFilterParams } from '../types/filterTypes';
 
 const API_BASE_URL = 'https://be-2-report.vercel.app';
