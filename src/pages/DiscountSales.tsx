@@ -12,8 +12,12 @@ import {
   getYearOptions, 
   getMonthOptions,
   getCurrentYear,
-  getCurrentQuarter
+  getCurrentQuarter,
+  sortCountriesByThai
 } from '../utils/dateUtils'
+
+type SortField = 'total_commission' | 'total_discount' | 'discount_percentage' | 'order_count' | 'net_commission'
+type SortDirection = 'asc' | 'desc'
 
 
 const DiscountSales: React.FC = () => {
@@ -37,6 +41,10 @@ const DiscountSales: React.FC = () => {
   const [selectedJobPosition, setSelectedJobPosition] = useState<string | undefined>(undefined)
   const [selectedTeam, setSelectedTeam] = useState<number | undefined>(undefined)
   const [selectedUser, setSelectedUser] = useState<number | undefined>(undefined)
+
+  // Sorting states
+  const [sortField, setSortField] = useState<SortField | null>(null)
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   // Load countries and filter options on mount
   useEffect(() => {
@@ -133,6 +141,9 @@ const DiscountSales: React.FC = () => {
           b.metrics.total_commission - a.metrics.total_commission
         )
         setData(sortedData)
+        // Reset sorting when new data is loaded
+        setSortField(null)
+        setSortDirection('desc')
       } else {
         setData([])
       }
@@ -142,6 +153,56 @@ const DiscountSales: React.FC = () => {
       console.error('Failed to load discount sales data:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSort = (field: SortField) => {
+    let newDirection: SortDirection = 'desc'
+    
+    if (sortField === field) {
+      // If clicking the same field, toggle direction
+      newDirection = sortDirection === 'desc' ? 'asc' : 'desc'
+    }
+    
+    setSortField(field)
+    setSortDirection(newDirection)
+    
+    // Sort the data
+    const sortedData = [...data].sort((a, b) => {
+      const aValue = a.metrics[field]
+      const bValue = b.metrics[field]
+      
+      if (newDirection === 'desc') {
+        return bValue - aValue
+      } else {
+        return aValue - bValue
+      }
+    })
+    
+    setData(sortedData)
+  }
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return (
+        <svg className="w-4 h-4 ml-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        </svg>
+      )
+    }
+    
+    if (sortDirection === 'desc') {
+      return (
+        <svg className="w-4 h-4 ml-1 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+        </svg>
+      )
+    } else {
+      return (
+        <svg className="w-4 h-4 ml-1 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        </svg>
+      )
     }
   }
 
@@ -424,7 +485,7 @@ const DiscountSales: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">ทุกประเทศ</option>
-              {countries.map(country => (
+              {sortCountriesByThai(countries).map(country => (
                 <option key={country.id} value={country.id}>
                   {country.name_th}
                 </option>
@@ -669,19 +730,49 @@ const DiscountSales: React.FC = () => {
                           ชื่อเล่น
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Total Commission
+                          <button
+                            onClick={() => handleSort('total_commission')}
+                            className="flex items-center justify-end w-full hover:text-gray-700 focus:outline-none"
+                          >
+                            Total Commission
+                            {getSortIcon('total_commission')}
+                          </button>
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Total Discount
+                          <button
+                            onClick={() => handleSort('total_discount')}
+                            className="flex items-center justify-end w-full hover:text-gray-700 focus:outline-none"
+                          >
+                            Total Discount
+                            {getSortIcon('total_discount')}
+                          </button>
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Discount %
+                          <button
+                            onClick={() => handleSort('discount_percentage')}
+                            className="flex items-center justify-end w-full hover:text-gray-700 focus:outline-none"
+                          >
+                            Discount %
+                            {getSortIcon('discount_percentage')}
+                          </button>
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Orders
+                          <button
+                            onClick={() => handleSort('order_count')}
+                            className="flex items-center justify-center w-full hover:text-gray-700 focus:outline-none"
+                          >
+                            Orders
+                            {getSortIcon('order_count')}
+                          </button>
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Net Commission
+                          <button
+                            onClick={() => handleSort('net_commission')}
+                            className="flex items-center justify-end w-full hover:text-gray-700 focus:outline-none"
+                          >
+                            Net Commission
+                            {getSortIcon('net_commission')}
+                          </button>
                         </th>
                       </tr>
                     </thead>

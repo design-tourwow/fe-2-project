@@ -7,6 +7,16 @@ export const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
+// ฟังก์ชันสำหรับเรียงลำดับประเทศตามตัวอักษรภาษาไทย
+export const sortCountriesByThai = <T extends { name_th: string }>(countries: T[]): T[] => {
+  return [...countries].sort((a, b) => {
+    return a.name_th.localeCompare(b.name_th, 'th-TH', { 
+      numeric: true, 
+      sensitivity: 'base' 
+    });
+  });
+};
+
 export const getCurrentQuarter = (): number => {
   const month = new Date().getMonth() + 1; // 0-based to 1-based
   return Math.ceil(month / 3);

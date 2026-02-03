@@ -10,7 +10,8 @@ import {
   getYearOptions, 
   getMonthOptions,
   getCurrentYear,
-  getCurrentQuarter
+  getCurrentQuarter,
+  sortCountriesByThai
 } from '../utils/dateUtils'
 
 type SortField = 'total_commission' | 'total_net_commission' | 'total_pax' | 'avg_commission_per_pax' | 'avg_net_commission_per_pax'
@@ -416,7 +417,7 @@ const SupplierCommission: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">ทุกประเทศ</option>
-              {countries.map(country => (
+              {sortCountriesByThai(countries).map(country => (
                 <option key={country.id} value={country.id}>
                   {country.name_th}
                 </option>
