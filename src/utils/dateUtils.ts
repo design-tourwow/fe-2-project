@@ -17,6 +17,19 @@ export const sortCountriesByThai = <T extends { name_th: string }>(countries: T[
   });
 };
 
+// ฟังก์ชันสำหรับกรองและแสดงผลตำแหน่งงาน
+export const filterAndDisplayJobPositions = <T extends { job_position: string }>(jobPositions: T[]): Array<T & { display_name: string }> => {
+  return jobPositions
+    .filter(position => {
+      const jobPos = position.job_position.toLowerCase();
+      return jobPos === 'ts' || jobPos === 'crm';
+    })
+    .map(position => ({
+      ...position,
+      display_name: position.job_position.toLowerCase() === 'ts' ? 'เซลล์' : 'CRM'
+    }));
+};
+
 export const getCurrentQuarter = (): number => {
   const month = new Date().getMonth() + 1; // 0-based to 1-based
   return Math.ceil(month / 3);

@@ -13,7 +13,8 @@ import {
   getMonthOptions,
   getCurrentYear,
   getCurrentQuarter,
-  sortCountriesByThai
+  sortCountriesByThai,
+  filterAndDisplayJobPositions
 } from '../utils/dateUtils'
 
 type SortField = 'total_commission' | 'total_discount' | 'discount_percentage' | 'order_count' | 'net_commission'
@@ -507,9 +508,9 @@ const DiscountSales: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">ทุกตำแหน่ง</option>
-              {jobPositions.map(position => (
+              {filterAndDisplayJobPositions(jobPositions).map(position => (
                 <option key={position.job_position} value={position.job_position}>
-                  {position.job_position}
+                  {position.display_name}
                 </option>
               ))}
             </select>
