@@ -1,4 +1,5 @@
 import { SupplierReportData, Country, ApiResponse, FilterParams } from '../types/supplier';
+import { ExtendedFilterParams } from '../types/filterTypes';
 
 const API_BASE_URL = 'https://be-2-report.vercel.app';
 
@@ -40,10 +41,13 @@ class SupplierApiService {
     }
   }
 
-  async getSupplierReport(params: FilterParams): Promise<SupplierReportData[]> {
+  async getSupplierReport(params: ExtendedFilterParams): Promise<SupplierReportData[]> {
     try {
       const queryParams = new URLSearchParams();
-      queryParams.append('year', params.year.toString());
+      
+      if (params.year) {
+        queryParams.append('year', params.year.toString());
+      }
       
       if (params.quarter) {
         queryParams.append('quarter', params.quarter.toString());
@@ -57,8 +61,21 @@ class SupplierApiService {
         queryParams.append('country_id', params.country_id.toString());
       }
 
+      // เพิ่ม Parameters ใหม่
+      if (params.job_position) {
+        queryParams.append('job_position', params.job_position);
+      }
+      
+      if (params.team_number) {
+        queryParams.append('team_number', params.team_number.toString());
+      }
+      
+      if (params.user_id) {
+        queryParams.append('user_id', params.user_id.toString());
+      }
+
       const url = `/api/reports/supplier-performance?${queryParams.toString()}`;
-      console.log('API URL:', `${API_BASE_URL}${url}`); // Debug log
+      console.log('Supplier Performance API URL:', `${API_BASE_URL}${url}`);
 
       const response = await this.request<ApiResponse<SupplierReportData[]>>(url);
       

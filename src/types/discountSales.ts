@@ -1,6 +1,7 @@
 export interface DiscountSalesData {
   sales_id: number;
   sales_name: string;
+  nickname?: string; // Added nickname field
   metrics: {
     total_commission: number;
     total_discount: number;

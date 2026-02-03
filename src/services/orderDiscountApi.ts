@@ -1,4 +1,5 @@
-import { OrderDiscountData, OrderDiscountParams, ApiResponse } from '../types/orderDiscount';
+import { OrderDiscountData, ApiResponse } from '../types/orderDiscount';
+import { ExtendedFilterParams } from '../types/filterTypes';
 
 const API_BASE_URL = 'https://be-2-report.vercel.app';
 
@@ -19,7 +20,7 @@ class OrderDiscountApiService {
     }
   }
 
-  async getOrderDiscountReport(params: OrderDiscountParams = {}): Promise<OrderDiscountData[]> {
+  async getOrderDiscountReport(params: ExtendedFilterParams = {}): Promise<OrderDiscountData[]> {
     try {
       const queryParams = new URLSearchParams();
       
@@ -37,6 +38,19 @@ class OrderDiscountApiService {
       
       if (params.country_id && params.country_id > 0) {
         queryParams.append('country_id', params.country_id.toString());
+      }
+
+      // เพิ่ม Parameters ใหม่
+      if (params.job_position) {
+        queryParams.append('job_position', params.job_position);
+      }
+      
+      if (params.team_number) {
+        queryParams.append('team_number', params.team_number.toString());
+      }
+      
+      if (params.user_id) {
+        queryParams.append('user_id', params.user_id.toString());
       }
 
       const url = `/api/reports/order-has-discount${queryParams.toString() ? '?' + queryParams.toString() : ''}`;

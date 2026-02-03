@@ -1,4 +1,5 @@
-import { DiscountSalesData, DiscountSalesParams, ApiResponse } from '../types/discountSales';
+import { DiscountSalesData, ApiResponse } from '../types/discountSales';
+import { ExtendedFilterParams } from '../types/filterTypes';
 
 const API_BASE_URL = 'https://be-2-report.vercel.app';
 
@@ -19,10 +20,13 @@ class DiscountSalesApiService {
     }
   }
 
-  async getDiscountSalesReport(params: DiscountSalesParams): Promise<DiscountSalesData[]> {
+  async getDiscountSalesReport(params: ExtendedFilterParams): Promise<DiscountSalesData[]> {
     try {
       const queryParams = new URLSearchParams();
-      queryParams.append('year', params.year.toString());
+      
+      if (params.year) {
+        queryParams.append('year', params.year.toString());
+      }
       
       if (params.quarter) {
         queryParams.append('quarter', params.quarter.toString());
@@ -36,8 +40,21 @@ class DiscountSalesApiService {
         queryParams.append('country_id', params.country_id.toString());
       }
 
+      // เพิ่ม Parameters ใหม่
+      if (params.job_position) {
+        queryParams.append('job_position', params.job_position);
+      }
+      
+      if (params.team_number) {
+        queryParams.append('team_number', params.team_number.toString());
+      }
+      
+      if (params.user_id) {
+        queryParams.append('user_id', params.user_id.toString());
+      }
+
       const url = `/api/reports/sales-discount?${queryParams.toString()}`;
-      console.log('Discount Sales API URL:', `${API_BASE_URL}${url}`);
+      console.log('Sales Discount API URL:', `${API_BASE_URL}${url}`);
 
       const response = await this.request<DiscountSalesData[] | ApiResponse<DiscountSalesData[]>>(url);
       

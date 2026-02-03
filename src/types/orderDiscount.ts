@@ -37,6 +37,12 @@ export interface SalesSummary {
   total_discount: number;
   avg_discount_percent: number;
   total_net_amount: number;
+  discount_breakdown?: {
+    no_discount: number;
+    discount_1_15: number;
+    discount_15_20: number;
+    discount_over_20: number;
+  };
 }
 
 export interface ApiResponse<T> {

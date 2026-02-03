@@ -30,7 +30,7 @@ export interface FilterParams {
   country_id?: number;
 }
 
-export type FilterMode = 'quarterly' | 'monthly' | 'yearly';
+export type FilterMode = 'quarterly' | 'monthly' | 'yearly' | 'all';
 
 export interface QuarterOption {
   label: string;

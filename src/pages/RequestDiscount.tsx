@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { OrderDiscountData, OrderDiscountParams, SalesSummary } from '../types/orderDiscount'
+import { ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
+import { OrderDiscountData, SalesSummary } from '../types/orderDiscount'
 import { Country, FilterMode } from '../types/supplier'
 import { orderDiscountApiService } from '../services/orderDiscountApi'
 import { supplierApiService } from '../services/supplierApi'
@@ -13,15 +13,26 @@ import {
   getCurrentQuarter
 } from '../utils/dateUtils'
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C'];
+// Import new types and services
+import { ExtendedFilterParams, Team, JobPosition, User } from '../types/filterTypes'
+import { filterApiService } from '../services/filterService'
 
 const RequestDiscount: React.FC = () => {
   const [data, setData] = useState<OrderDiscountData[]>([])
   const [allOrdersData, setAllOrdersData] = useState<OrderDiscountData[]>([]) // เก็บข้อมูลทั้งหมด
   const [countries, setCountries] = useState<Country[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [jobPositions, setJobPositions] = useState<JobPosition[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showDiscountOnly, setShowDiscountOnly] = useState(true) // Default เป็น true
+  const [showUnpaidOnly, setShowUnpaidOnly] = useState(false) // Filter สำหรับ Order ที่ยังไม่ชำระเงิน
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 50
   
   // Filter states
   const [filterMode, setFilterMode] = useState<FilterMode>('quarterly')
@@ -30,32 +41,70 @@ const RequestDiscount: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedCountry, setSelectedCountry] = useState<number | undefined>(undefined)
 
-  // Load countries on mount
+  // New filter states
+  const [selectedJobPosition, setSelectedJobPosition] = useState<string | undefined>(undefined)
+  const [selectedTeam, setSelectedTeam] = useState<number | undefined>(undefined)
+  const [selectedUser, setSelectedUser] = useState<number | undefined>(undefined)
+
+  // Load countries and filter options on mount
   useEffect(() => {
-    const loadCountries = async () => {
+    const loadInitialData = async () => {
       try {
-        const countriesData = await supplierApiService.getCountries()
+        const [countriesData, teamsData, jobPositionsData, usersData] = await Promise.all([
+          supplierApiService.getCountries(),
+          filterApiService.getTeams(),
+          filterApiService.getJobPositions(),
+          filterApiService.getUsers()
+        ])
+        
         setCountries(countriesData)
+        setTeams(teamsData)
+        setJobPositions(jobPositionsData)
+        setUsers(usersData)
+        setFilteredUsers(usersData)
       } catch (err) {
-        console.error('Failed to load countries:', err)
+        console.error('Failed to load initial data:', err)
       }
     }
-    loadCountries()
+    loadInitialData()
   }, [])
+
+  // Update filtered users when team or job position changes
+  useEffect(() => {
+    let filtered = users
+
+    if (selectedTeam) {
+      filtered = filtered.filter(user => user.team_number === selectedTeam)
+    }
+
+    if (selectedJobPosition) {
+      filtered = filtered.filter(user => 
+        user.job_position.toLowerCase() === selectedJobPosition.toLowerCase()
+      )
+    }
+
+    setFilteredUsers(filtered)
+    
+    // Clear user selection if current user is not in filtered list
+    if (selectedUser && !filtered.find(user => user.ID === selectedUser)) {
+      setSelectedUser(undefined)
+    }
+  }, [selectedTeam, selectedJobPosition, users, selectedUser])
 
   // Load data when filters change
   useEffect(() => {
     loadReportData()
-  }, [filterMode, selectedYear, selectedQuarter, selectedMonth, selectedCountry])
+  }, [filterMode, selectedYear, selectedQuarter, selectedMonth, selectedCountry, selectedJobPosition, selectedTeam, selectedUser])
 
   const loadReportData = async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const params: OrderDiscountParams = {}
+      const params: ExtendedFilterParams = {}
 
-      if (selectedYear) {
+      // เพิ่ม year เฉพาะเมื่อไม่ใช่ 'all' mode
+      if (filterMode !== 'all' && selectedYear) {
         params.year = selectedYear
       }
 
@@ -67,6 +116,19 @@ const RequestDiscount: React.FC = () => {
         params.quarter = selectedQuarter
       } else if (filterMode === 'monthly' && selectedMonth) {
         params.month = selectedMonth
+      }
+
+      // Add new filter parameters
+      if (selectedJobPosition) {
+        params.job_position = selectedJobPosition
+      }
+      
+      if (selectedTeam) {
+        params.team_number = selectedTeam
+      }
+      
+      if (selectedUser) {
+        params.user_id = selectedUser
       }
 
       console.log('Order Discount API Params:', params)
@@ -105,12 +167,32 @@ const RequestDiscount: React.FC = () => {
   // เมื่อ checkbox เปลี่ยน
   useEffect(() => {
     if (allOrdersData.length > 0) {
-      const filteredData = showDiscountOnly 
-        ? allOrdersData.filter(order => order.financial_metrics.discount >= 1)
-        : allOrdersData
+      let filteredData = allOrdersData
+
+      // กรองตาม discount
+      if (showDiscountOnly) {
+        filteredData = filteredData.filter(order => order.financial_metrics.discount >= 1)
+      }
+
+      // กรองตาม payment status
+      if (showUnpaidOnly) {
+        filteredData = filteredData.filter(order => !order.payment_details.status_list.includes('paid'))
+      }
+
       setData(filteredData)
+      setCurrentPage(1) // Reset to first page when filter changes
     }
-  }, [showDiscountOnly, allOrdersData])
+  }, [showDiscountOnly, showUnpaidOnly, allOrdersData])
+
+  // Calculate pagination
+  const totalPages = Math.ceil(data.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const currentData = data.slice(startIndex, endIndex)
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   const handleFilterModeChange = (mode: FilterMode) => {
     setFilterMode(mode)
@@ -126,13 +208,18 @@ const RequestDiscount: React.FC = () => {
   const monthOptions = getMonthOptions()
 
   // Calculate sales summary - ใช้ข้อมูลทั้งหมดในการคำนวณ
-  const salesSummary: SalesSummary[] = React.useMemo(() => {
+  const salesSummary = React.useMemo(() => {
     const salesMap = new Map<string, {
       orders_with_discount: number;
       total_orders: number;
       total_discount: number;
       total_discount_percent: number;
       total_net_amount: number;
+      // เพิ่มการนับตามช่วงเปอร์เซ็นต์
+      no_discount: number;
+      discount_1_15: number;
+      discount_15_20: number;
+      discount_over_20: number;
     }>()
 
     // นับ Order ทั้งหมดของแต่ละเซลล์
@@ -143,17 +230,38 @@ const RequestDiscount: React.FC = () => {
         total_orders: 0,
         total_discount: 0,
         total_discount_percent: 0,
-        total_net_amount: 0
+        total_net_amount: 0,
+        no_discount: 0,
+        discount_1_15: 0,
+        discount_15_20: 0,
+        discount_over_20: 0
       }
 
       const hasDiscount = order.financial_metrics.discount >= 1
+      const discountPercent = order.financial_metrics.discount_percent
+
+      // จัดกลุ่มตามช่วงเปอร์เซ็นต์
+      let categoryUpdate = { ...existing }
+      if (discountPercent === 0) {
+        categoryUpdate.no_discount += 1
+      } else if (discountPercent > 0 && discountPercent <= 15) {
+        categoryUpdate.discount_1_15 += 1
+      } else if (discountPercent > 15 && discountPercent <= 20) {
+        categoryUpdate.discount_15_20 += 1
+      } else if (discountPercent > 20) {
+        categoryUpdate.discount_over_20 += 1
+      }
 
       salesMap.set(sellerName, {
         orders_with_discount: existing.orders_with_discount + (hasDiscount ? 1 : 0),
         total_orders: existing.total_orders + 1,
         total_discount: existing.total_discount + order.financial_metrics.discount,
         total_discount_percent: existing.total_discount_percent + order.financial_metrics.discount_percent,
-        total_net_amount: existing.total_net_amount + order.financial_metrics.net_amount
+        total_net_amount: existing.total_net_amount + order.financial_metrics.net_amount,
+        no_discount: categoryUpdate.no_discount,
+        discount_1_15: categoryUpdate.discount_1_15,
+        discount_15_20: categoryUpdate.discount_15_20,
+        discount_over_20: categoryUpdate.discount_over_20
       })
     })
 
@@ -163,8 +271,15 @@ const RequestDiscount: React.FC = () => {
       total_orders: stats.total_orders, // จำนวน Order ทั้งหมด
       total_discount: stats.total_discount,
       avg_discount_percent: stats.orders_with_discount > 0 ? stats.total_discount_percent / stats.orders_with_discount : 0,
-      total_net_amount: stats.total_net_amount
-    })).sort((a, b) => b.order_count - a.order_count) // เรียงตาม Order ที่มีส่วนลดมากที่สุด
+      total_net_amount: stats.total_net_amount,
+      // เพิ่มข้อมูลสัดส่วน
+      discount_breakdown: {
+        no_discount: stats.no_discount,
+        discount_1_15: stats.discount_1_15,
+        discount_15_20: stats.discount_15_20,
+        discount_over_20: stats.discount_over_20
+      }
+    } as SalesSummary & { total_orders: number; discount_breakdown: any })).sort((a, b) => b.total_discount - a.total_discount) // เรียงตามส่วนลดรวมมากที่สุด
   }, [allOrdersData])
 
   // Calculate overall metrics
@@ -181,29 +296,144 @@ const RequestDiscount: React.FC = () => {
     ? data.reduce((acc, order) => acc + order.financial_metrics.discount_percent, 0) / data.length 
     : 0
 
-  // Chart data
-  const salesChartData = salesSummary.slice(0, 8).map(item => ({
-    name: item.seller_name.length > 15 ? item.seller_name.substring(0, 15) + '...' : item.seller_name,
-    orders: item.order_count,
-    discount: item.total_discount,
-    avgPercent: item.avg_discount_percent
-  }))
+  // Export to CSV function
+  const exportToCSV = () => {
+    // Create CSV headers with Thai support
+    const headers = [
+      'Order Code',
+      'วันที่สร้าง',
+      'ลูกค้า',
+      'เซลล์',
+      'CRM',
+      'ยอดสุทธิ (฿)',
+      'คอมมิชชั่น (฿)',
+      'ส่วนลด (฿)',
+      'เปอร์เซ็นต์ส่วนลด (%)',
+      'การชำระเงิน (งวด)',
+      'สถานะการชำระ'
+    ]
 
-  const discountPieData = salesSummary.slice(0, 6).map(item => ({
-    name: item.seller_name,
-    value: item.total_discount
-  }))
+    // Create CSV rows
+    const csvRows = [
+      headers.join(','),
+      ...data.map(order => [
+        `"${order.order_info.order_code}"`,
+        `"${formatDate(order.order_info.created_at)}"`,
+        `"${order.customer_info.customer_name}"`,
+        `"${order.sales_crm.seller_name}"`,
+        `"${order.sales_crm.crm_name}"`,
+        formatCurrency(order.financial_metrics.net_amount),
+        formatCurrency(order.financial_metrics.supplier_commission),
+        formatCurrency(order.financial_metrics.discount),
+        Math.round(order.financial_metrics.discount_percent),
+        `"${order.payment_details.paid_installments}/${order.payment_details.total_installments}"`,
+        `"${order.payment_details.status_list}"`
+      ].join(','))
+    ]
+
+    // Add summary row
+    csvRows.push('')
+    csvRows.push('สรุปรวม')
+    csvRows.push([
+      'รวมทั้งหมด',
+      '',
+      '',
+      '',
+      '',
+      formatCurrency(overallMetrics.totalNetAmount),
+      formatCurrency(overallMetrics.totalCommission),
+      formatCurrency(overallMetrics.totalDiscount),
+      Math.round(avgDiscountPercent),
+      `"${overallMetrics.totalOrders} Orders"`,
+      ''
+    ].join(','))
+
+    // Create and download CSV file with UTF-8 BOM for Thai support
+    const csvContent = '\uFEFF' + csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob)
+      link.setAttribute('href', url)
+      
+      // Generate filename with current date
+      const now = new Date()
+      const dateStr = now.toISOString().split('T')[0]
+      const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-')
+      link.setAttribute('download', `order-discount-report-${dateStr}-${timeStr}.csv`)
+      
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+  }
+
+  // Chart data - prepare data similar to DiscountSales page
+  const discountChartData = [...salesSummary]
+    .sort((a, b) => b.total_discount - a.total_discount)
+    .slice(0, 8)
+    .map(item => ({
+      name: item.seller_name.length > 15 ? item.seller_name.substring(0, 15) + '...' : item.seller_name,
+      value: item.total_discount,
+      fullData: item
+    }))
+
+  const percentageChartData = [...salesSummary]
+    .sort((a, b) => b.avg_discount_percent - a.avg_discount_percent)
+    .slice(0, 10)
+    .map(item => ({
+      name: item.seller_name.length > 15 ? item.seller_name.substring(0, 15) + '...' : item.seller_name,
+      percentage: item.avg_discount_percent,
+      discount: item.total_discount,
+      orders: item.order_count
+    }))
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload
       return (
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-medium">{data.name}</p>
-          {data.orders && <p className="text-blue-600">Orders: {data.orders}</p>}
-          {data.discount && <p className="text-red-600">ส่วนลด: ฿{formatCurrency(data.discount)}</p>}
-          {data.avgPercent && <p className="text-orange-600">เฉลี่ย: {data.avgPercent.toFixed(2)}%</p>}
-          {data.value && <p className="text-red-600">ส่วนลด: ฿{formatCurrency(data.value)}</p>}
+          <p className="font-medium">{data.fullData?.seller_name || data.name}</p>
+          {data.value !== undefined ? (
+            // Left chart (discount amount)
+            <>
+              <p className="text-red-600">
+                ส่วนลด: ฿{formatCurrency(data.value)}
+              </p>
+              {data.fullData && (
+                <>
+                  <p className="text-blue-600">
+                    Orders: {data.fullData.order_count}
+                  </p>
+                  <p className="text-gray-600">
+                    เฉลี่ย: {Math.round(data.fullData.avg_discount_percent)}%
+                  </p>
+                </>
+              )}
+            </>
+          ) : data.percentage !== undefined ? (
+            // Right chart (percentage)
+            <>
+              <p className="text-orange-600">
+                ส่วนลด: {Math.round(data.percentage)}%
+              </p>
+              <p className="text-red-600">
+                จำนวนเงิน: ฿{formatCurrency(data.discount)}
+              </p>
+              <p className="text-blue-600">
+                Orders: {data.orders}
+              </p>
+            </>
+          ) : (
+            // Original charts
+            <>
+              {data.orders && <p className="text-blue-600">Orders: {data.orders}</p>}
+              {data.discount && <p className="text-red-600">ส่วนลด: ฿{formatCurrency(data.discount)}</p>}
+              {data.avgPercent && <p className="text-orange-600">เฉลี่ย: {Math.round(data.avgPercent)}%</p>}
+            </>
+          )}
         </div>
       )
     }
@@ -243,7 +473,7 @@ const RequestDiscount: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">ตัวกรอง</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
           {/* Filter Mode */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -254,6 +484,7 @@ const RequestDiscount: React.FC = () => {
               onChange={(e) => handleFilterModeChange(e.target.value as FilterMode)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
+              <option value="all">ทั้งหมด</option>
               <option value="quarterly">รายไตรมาส</option>
               <option value="monthly">รายเดือน</option>
               <option value="yearly">รายปี</option>
@@ -340,6 +571,12 @@ const RequestDiscount: React.FC = () => {
             </div>
           )}
 
+          {filterMode === 'all' && (
+            <div className="col-span-1">
+              {/* Placeholder div เพื่อให้ layout สวย */}
+            </div>
+          )}
+
           {/* Country Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -354,6 +591,69 @@ const RequestDiscount: React.FC = () => {
               {countries.map(country => (
                 <option key={country.id} value={country.id}>
                   {country.name_th}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Job Position Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              👥 ตำแหน่งงาน
+            </label>
+            <select 
+              value={selectedJobPosition || ''}
+              onChange={(e) => {
+                setSelectedJobPosition(e.target.value || undefined)
+                setSelectedUser(undefined) // Clear user selection
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">ทุกตำแหน่ง</option>
+              {jobPositions.map(position => (
+                <option key={position.job_position} value={position.job_position}>
+                  {position.job_position}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Team Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              🏢 ทีม
+            </label>
+            <select 
+              value={selectedTeam || ''}
+              onChange={(e) => {
+                setSelectedTeam(e.target.value ? parseInt(e.target.value) : undefined)
+                setSelectedUser(undefined) // Clear user selection
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">ทุกทีม</option>
+              {teams.map(team => (
+                <option key={team.team_number} value={team.team_number}>
+                  Team {team.team_number}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* User Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              👤 ผู้ใช้
+            </label>
+            <select 
+              value={selectedUser || ''}
+              onChange={(e) => setSelectedUser(e.target.value ? parseInt(e.target.value) : undefined)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">ทุกคน</option>
+              {filteredUsers.map(user => (
+                <option key={user.ID} value={user.ID}>
+                  {user.nickname || `${user.first_name} ${user.last_name}`.trim()}
                 </option>
               ))}
             </select>
@@ -456,7 +756,7 @@ const RequestDiscount: React.FC = () => {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">% ส่วนลดเฉลี่ย</p>
-                      <p className="text-2xl font-semibold text-gray-900">{avgDiscountPercent.toFixed(2)}%</p>
+                      <p className="text-2xl font-semibold text-gray-900">{Math.round(avgDiscountPercent)}%</p>
                     </div>
                   </div>
                 </div>
@@ -465,8 +765,8 @@ const RequestDiscount: React.FC = () => {
               {/* Sales Summary Table */}
               <div className="bg-white rounded-lg shadow overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-semibold text-gray-900">Top Sales ที่ขอส่วนลดให้ลูกค้ามากที่สุด</h2>
-                  <p className="text-sm text-gray-600 mt-1">เรียงตามจำนวน Order ที่มีการขอส่วนลด</p>
+                  <h2 className="text-lg font-semibold text-gray-900">Top Sales ที่ให้ส่วนลดมากที่สุด</h2>
+                  <p className="text-sm text-gray-600 mt-1">เรียงตามจำนวนเงินส่วนลดรวมสูงสุด</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
@@ -477,6 +777,9 @@ const RequestDiscount: React.FC = () => {
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           เซลล์
+                        </th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          สัดส่วน % ส่วนลด
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Order มีส่วนลด / ทั้งหมด
@@ -490,8 +793,19 @@ const RequestDiscount: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {salesSummary.map((sales, index) => (
-                        <tr key={sales.seller_name} className="hover:bg-gray-50">
+                      {salesSummary.map((sales, index) => {
+                        // กำหนดสีพื้นหลังสำหรับ 3 อันดับแรก
+                        let rowBgClass = 'hover:bg-gray-50'
+                        if (index === 0) {
+                          rowBgClass = 'bg-red-100 hover:bg-red-200 border-l-4 border-red-600'
+                        } else if (index === 1) {
+                          rowBgClass = 'bg-red-50 hover:bg-red-100 border-l-4 border-red-400'
+                        } else if (index === 2) {
+                          rowBgClass = 'bg-pink-50 hover:bg-red-50 border-l-4 border-red-300'
+                        }
+
+                        return (
+                        <tr key={sales.seller_name} className={rowBgClass}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
@@ -502,28 +816,56 @@ const RequestDiscount: React.FC = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              {sales.seller_name}
+                            <div className="flex items-center">
+                              <div className="text-sm font-medium text-gray-900">
+                                {sales.seller_name}
+                                {index === 0 && (
+                                  <span className="ml-2 text-red-600 text-lg animate-pulse" title="🔥 อันดับ 1 ส่วนลดสูงสุด! 🔥">
+                                    😠💢
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <div className="text-xs space-y-1">
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">ไม่ขอส่วนลดเลย:</span>
+                                <span className="font-medium">{sales.discount_breakdown?.no_discount || 0} Order</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-blue-600">1-15%:</span>
+                                <span className="font-medium text-blue-600">{sales.discount_breakdown?.discount_1_15 || 0} Orders</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-orange-600">15-20%:</span>
+                                <span className="font-medium text-orange-600">{sales.discount_breakdown?.discount_15_20 || 0} Orders</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-red-600">20% ขึ้นไป:</span>
+                                <span className="font-medium text-red-600">{sales.discount_breakdown?.discount_over_20 || 0} Orders</span>
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <div className="text-sm">
                               <span className="font-medium text-blue-600">{sales.order_count}</span>
                               <span className="text-gray-500"> / </span>
-                              <span className="text-gray-900">{(sales as any).total_orders}</span>
+                              <span className="text-gray-900">{sales.total_orders}</span>
                             </div>
                             <div className="text-xs text-gray-500">
-                              ({(sales as any).total_orders > 0 ? ((sales.order_count / (sales as any).total_orders) * 100).toFixed(1) : 0}% มีส่วนลด)
+                              ({sales.total_orders > 0 ? Math.round((sales.order_count / sales.total_orders) * 100) : 0}% มีส่วนลด)
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-orange-600 font-medium">
-                            {sales.avg_discount_percent.toFixed(2)}%
+                            {Math.round(sales.avg_discount_percent)}%
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-red-600 font-medium">
                             ฿{formatCurrency(sales.total_discount)}
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -531,12 +873,12 @@ const RequestDiscount: React.FC = () => {
 
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Bar Chart */}
+                {/* Left Bar Chart - Top 8 ส่วนลด (by amount) */}
                 <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Orders ต่อเซลล์</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Top 8 ส่วนลด (จำนวนเงิน)</h2>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={salesChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                      <BarChart data={discountChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis 
                           dataKey="name" 
@@ -547,34 +889,32 @@ const RequestDiscount: React.FC = () => {
                         />
                         <YAxis />
                         <Tooltip content={<CustomTooltip />} />
-                        <Bar dataKey="orders" fill="#0088FE" />
+                        <Legend />
+                        <Bar dataKey="value" fill="#EF4444" name="ส่วนลด (฿)" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                {/* Pie Chart */}
+                {/* Right Bar Chart - Top 10 ส่วนลด (by percentage) */}
                 <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">สัดส่วนส่วนลด</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Top 10 ส่วนลด (เปอร์เซ็นต์)</h2>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={discountPieData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(1)}%`}
-                        >
-                          {discountPieData.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
+                      <BarChart data={percentageChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="name" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          fontSize={12}
+                        />
+                        <YAxis />
                         <Tooltip content={<CustomTooltip />} />
-                      </PieChart>
+                        <Legend />
+                        <Bar dataKey="percentage" fill="#FF8042" name="ส่วนลด (%)" />
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
@@ -586,10 +926,22 @@ const RequestDiscount: React.FC = () => {
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">รายละเอียด Orders</h2>
                     <p className="text-sm text-gray-600 mt-1">
-                      {showDiscountOnly ? 'แสดงเฉพาะ Order ที่มีส่วนลด ≥ ฿1' : 'แสดง Order ทั้งหมด'}
+                      {showDiscountOnly && showUnpaidOnly ? 'แสดงเฉพาะ Order ที่มีส่วนลด ≥ ฿1 และยังไม่ชำระเงิน' :
+                       showDiscountOnly ? 'แสดงเฉพาะ Order ที่มีส่วนลด ≥ ฿1' :
+                       showUnpaidOnly ? 'แสดงเฉพาะ Order ที่ยังไม่ชำระเงิน' :
+                       'แสดง Order ทั้งหมด'}
                     </p>
                   </div>
-                  <div className="flex items-center">
+                  <div className="flex items-center space-x-4">
+                    <button
+                      onClick={exportToCSV}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Export CSV
+                    </button>
                     <label className="flex items-center">
                       <input
                         type="checkbox"
@@ -599,6 +951,17 @@ const RequestDiscount: React.FC = () => {
                       />
                       <span className="ml-2 text-sm text-gray-700">
                         แสดงเฉพาะ Order ที่มีส่วนลด
+                      </span>
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={showUnpaidOnly}
+                        onChange={(e) => setShowUnpaidOnly(e.target.checked)}
+                        className="rounded border-gray-300 text-red-600 shadow-sm focus:border-red-300 focus:ring focus:ring-red-200 focus:ring-opacity-50"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">
+                        แสดงเฉพาะ Order ที่ยังไม่ชำระเงิน
                       </span>
                     </label>
                   </div>
@@ -643,7 +1006,7 @@ const RequestDiscount: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {data.map((order) => (
+                      {currentData.map((order) => (
                         <tr key={order.order_info.order_code} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-blue-600">
@@ -678,7 +1041,7 @@ const RequestDiscount: React.FC = () => {
                             ฿{formatCurrency(order.financial_metrics.discount)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-orange-600">
-                            {order.financial_metrics.discount_percent.toFixed(2)}%
+                            {Math.round(order.financial_metrics.discount_percent)}%
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <div className="flex flex-col items-center">
@@ -705,7 +1068,7 @@ const RequestDiscount: React.FC = () => {
                 <div className="bg-gray-50 px-6 py-3 border-t">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-600">
-                      แสดง {data.length} รายการ
+                      แสดง {startIndex + 1}-{Math.min(endIndex, data.length)} จาก {data.length} รายการ
                     </span>
                     <div className="flex space-x-6 text-gray-600">
                       <span>
@@ -720,6 +1083,64 @@ const RequestDiscount: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="bg-white px-6 py-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-sm text-gray-700">
+                        <span>หน้า {currentPage} จาก {totalPages}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          ก่อนหน้า
+                        </button>
+                        
+                        {/* Page numbers */}
+                        <div className="flex space-x-1">
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum
+                            if (totalPages <= 5) {
+                              pageNum = i + 1
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i
+                            } else {
+                              pageNum = currentPage - 2 + i
+                            }
+                            
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => handlePageChange(pageNum)}
+                                className={`px-3 py-1 text-sm border rounded-md ${
+                                  currentPage === pageNum
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'border-gray-300 hover:bg-gray-50'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        <button
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          ถัดไป
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}

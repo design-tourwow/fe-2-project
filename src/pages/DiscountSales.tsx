@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { DiscountSalesData, DiscountSalesParams } from '../types/discountSales'
+import { ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts'
+import { DiscountSalesData } from '../types/discountSales'
 import { Country, FilterMode } from '../types/supplier'
+import { ExtendedFilterParams, Team, JobPosition, User } from '../types/filterTypes'
 import { discountSalesApiService } from '../services/discountSalesApi'
 import { supplierApiService } from '../services/supplierApi'
+import { filterApiService } from '../services/filterService'
 import { 
   formatCurrency, 
   getQuarterOptions, 
@@ -13,11 +15,14 @@ import {
   getCurrentQuarter
 } from '../utils/dateUtils'
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C'];
 
 const DiscountSales: React.FC = () => {
   const [data, setData] = useState<DiscountSalesData[]>([])
   const [countries, setCountries] = useState<Country[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [jobPositions, setJobPositions] = useState<JobPosition[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -28,31 +33,71 @@ const DiscountSales: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedCountry, setSelectedCountry] = useState<number | undefined>(undefined)
 
-  // Load countries on mount
+  // New filter states
+  const [selectedJobPosition, setSelectedJobPosition] = useState<string | undefined>(undefined)
+  const [selectedTeam, setSelectedTeam] = useState<number | undefined>(undefined)
+  const [selectedUser, setSelectedUser] = useState<number | undefined>(undefined)
+
+  // Load countries and filter options on mount
   useEffect(() => {
-    const loadCountries = async () => {
+    const loadInitialData = async () => {
       try {
-        const countriesData = await supplierApiService.getCountries()
+        const [countriesData, teamsData, jobPositionsData, usersData] = await Promise.all([
+          supplierApiService.getCountries(),
+          filterApiService.getTeams(),
+          filterApiService.getJobPositions(),
+          filterApiService.getUsers()
+        ])
+        
         setCountries(countriesData)
+        setTeams(teamsData)
+        setJobPositions(jobPositionsData)
+        setUsers(usersData)
+        setFilteredUsers(usersData)
       } catch (err) {
-        console.error('Failed to load countries:', err)
+        console.error('Failed to load initial data:', err)
       }
     }
-    loadCountries()
+    loadInitialData()
   }, [])
+
+  // Update filtered users when team or job position changes
+  useEffect(() => {
+    let filtered = users
+
+    if (selectedTeam) {
+      filtered = filtered.filter(user => user.team_number === selectedTeam)
+    }
+
+    if (selectedJobPosition) {
+      filtered = filtered.filter(user => 
+        user.job_position.toLowerCase() === selectedJobPosition.toLowerCase()
+      )
+    }
+
+    setFilteredUsers(filtered)
+    
+    // Clear user selection if current user is not in filtered list
+    if (selectedUser && !filtered.find(user => user.ID === selectedUser)) {
+      setSelectedUser(undefined)
+    }
+  }, [selectedTeam, selectedJobPosition, users, selectedUser])
 
   // Load data when filters change
   useEffect(() => {
     loadReportData()
-  }, [filterMode, selectedYear, selectedQuarter, selectedMonth, selectedCountry])
+  }, [filterMode, selectedYear, selectedQuarter, selectedMonth, selectedCountry, selectedJobPosition, selectedTeam, selectedUser])
 
   const loadReportData = async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const params: DiscountSalesParams = {
-        year: selectedYear
+      const params: ExtendedFilterParams = {}
+
+      // เพิ่ม year เฉพาะเมื่อไม่ใช่ 'all' mode
+      if (filterMode !== 'all' && selectedYear) {
+        params.year = selectedYear
       }
 
       if (selectedCountry && selectedCountry > 0) {
@@ -63,6 +108,19 @@ const DiscountSales: React.FC = () => {
         params.quarter = selectedQuarter
       } else if (filterMode === 'monthly') {
         params.month = selectedMonth
+      }
+
+      // Add new filter parameters
+      if (selectedJobPosition) {
+        params.job_position = selectedJobPosition
+      }
+      
+      if (selectedTeam) {
+        params.team_number = selectedTeam
+      }
+      
+      if (selectedUser) {
+        params.user_id = selectedUser
       }
 
       console.log('Discount Sales API Params:', params)
@@ -112,36 +170,120 @@ const DiscountSales: React.FC = () => {
     ? data.reduce((acc, item) => acc + item.metrics.discount_percentage, 0) / data.length 
     : 0
 
-  // Prepare chart data
-  const pieChartData = data.map(item => ({
-    name: item.sales_name,
-    value: item.metrics.total_discount,
-    fullData: item
-  }))
+  // Export to CSV function
+  const exportToCSV = () => {
+    // Create CSV headers with Thai support
+    const headers = [
+      'ชื่อเล่น',
+      'ค่าคอมรวม (฿)',
+      'ส่วนลดรวม (฿)',
+      'เปอร์เซ็นต์ส่วนลด (%)',
+      'จำนวน Orders',
+      'ยอดสุทธิ (฿)'
+    ]
 
-  const barChartData = data.slice(0, 10).map(item => ({
-    name: item.sales_name.length > 15 ? item.sales_name.substring(0, 15) + '...' : item.sales_name,
-    discount: item.metrics.total_discount,
-    commission: item.metrics.total_commission,
-    percentage: item.metrics.discount_percentage
-  }))
+    // Create CSV rows
+    const csvRows = [
+      headers.join(','),
+      ...data.map(item => [
+        `"${item.nickname || item.sales_name}"`,
+        formatCurrency(item.metrics.total_commission),
+        formatCurrency(item.metrics.total_discount),
+        Math.round(item.metrics.discount_percentage),
+        item.metrics.order_count,
+        formatCurrency(item.metrics.net_commission)
+      ].join(','))
+    ]
+
+    // Add summary row
+    csvRows.push('')
+    csvRows.push('สรุปรวม')
+    csvRows.push([
+      'รวมทั้งหมด',
+      formatCurrency(summaryMetrics.totalSales),
+      formatCurrency(summaryMetrics.totalDiscount),
+      Math.round(avgDiscountPercentage),
+      summaryMetrics.totalOrders,
+      formatCurrency(summaryMetrics.totalNet)
+    ].join(','))
+
+    // Create and download CSV file with UTF-8 BOM for Thai support
+    const csvContent = '\uFEFF' + csvRows.join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob)
+      link.setAttribute('href', url)
+      
+      // Generate filename with current date
+      const now = new Date()
+      const dateStr = now.toISOString().split('T')[0]
+      const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-')
+      link.setAttribute('download', `discount-sales-report-${dateStr}-${timeStr}.csv`)
+      
+      link.style.visibility = 'hidden'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+  }
+
+  // Prepare chart data - Left chart: sorted by discount amount (highest first)
+  const discountChartData = [...data]
+    .sort((a, b) => b.metrics.total_discount - a.metrics.total_discount)
+    .slice(0, 8)
+    .map(item => ({
+      name: (item.nickname || item.sales_name).length > 15 ? (item.nickname || item.sales_name).substring(0, 15) + '...' : (item.nickname || item.sales_name),
+      value: item.metrics.total_discount,
+      fullData: item
+    }))
+
+  // Right chart: sorted by discount percentage (highest first)
+  const barChartData = [...data]
+    .sort((a, b) => b.metrics.discount_percentage - a.metrics.discount_percentage)
+    .slice(0, 10)
+    .map(item => ({
+      name: (item.nickname || item.sales_name).length > 15 ? (item.nickname || item.sales_name).substring(0, 15) + '...' : (item.nickname || item.sales_name),
+      discount: item.metrics.total_discount,
+      commission: item.metrics.total_commission,
+      percentage: item.metrics.discount_percentage
+    }))
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload
       return (
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-          <p className="font-medium">{data.fullData?.sales_name || data.name}</p>
-          <p className="text-red-600">
-            ส่วนลด: ฿{formatCurrency(data.value || data.discount)}
-          </p>
-          {data.fullData && (
+          <p className="font-medium">{data.fullData?.nickname || data.fullData?.sales_name || data.name}</p>
+          {data.value !== undefined ? (
+            // Left chart (discount amount)
             <>
-              <p className="text-blue-600">
-                คอมมิชชั่น: ฿{formatCurrency(data.fullData.metrics.total_commission)}
+              <p className="text-red-600">
+                ส่วนลด: ฿{formatCurrency(data.value)}
               </p>
-              <p className="text-gray-600">
-                เปอร์เซ็นต์: {data.fullData.metrics.discount_percentage.toFixed(2)}%
+              {data.fullData && (
+                <>
+                  <p className="text-blue-600">
+                    คอมมิชชั่น: ฿{formatCurrency(data.fullData.metrics.total_commission)}
+                  </p>
+                  <p className="text-gray-600">
+                    เปอร์เซ็นต์: {Math.round(data.fullData.metrics.discount_percentage)}%
+                  </p>
+                </>
+              )}
+            </>
+          ) : (
+            // Right chart (percentage)
+            <>
+              <p className="text-orange-600">
+                ส่วนลด: {Math.round(data.percentage)}%
+              </p>
+              <p className="text-red-600">
+                จำนวนเงิน: ฿{formatCurrency(data.discount)}
+              </p>
+              <p className="text-blue-600">
+                คอมมิชชั่น: ฿{formatCurrency(data.commission)}
               </p>
             </>
           )}
@@ -167,7 +309,7 @@ const DiscountSales: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">ตัวกรอง</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
           {/* Filter Mode */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -178,6 +320,7 @@ const DiscountSales: React.FC = () => {
               onChange={(e) => handleFilterModeChange(e.target.value as FilterMode)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
+              <option value="all">ทั้งหมด</option>
               <option value="quarterly">รายไตรมาส</option>
               <option value="monthly">รายเดือน</option>
               <option value="yearly">รายปี</option>
@@ -264,6 +407,12 @@ const DiscountSales: React.FC = () => {
             </div>
           )}
 
+          {filterMode === 'all' && (
+            <div className="col-span-1">
+              {/* Placeholder div เพื่อให้ layout สวย */}
+            </div>
+          )}
+
           {/* Country Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -278,6 +427,69 @@ const DiscountSales: React.FC = () => {
               {countries.map(country => (
                 <option key={country.id} value={country.id}>
                   {country.name_th}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Job Position Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              👥 ตำแหน่งงาน
+            </label>
+            <select 
+              value={selectedJobPosition || ''}
+              onChange={(e) => {
+                setSelectedJobPosition(e.target.value || undefined)
+                setSelectedUser(undefined) // Clear user selection
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">ทุกตำแหน่ง</option>
+              {jobPositions.map(position => (
+                <option key={position.job_position} value={position.job_position}>
+                  {position.job_position}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Team Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              🏢 ทีม
+            </label>
+            <select 
+              value={selectedTeam || ''}
+              onChange={(e) => {
+                setSelectedTeam(e.target.value ? parseInt(e.target.value) : undefined)
+                setSelectedUser(undefined) // Clear user selection
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">ทุกทีม</option>
+              {teams.map(team => (
+                <option key={team.team_number} value={team.team_number}>
+                  Team {team.team_number}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* User Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              👤 ผู้ใช้
+            </label>
+            <select 
+              value={selectedUser || ''}
+              onChange={(e) => setSelectedUser(e.target.value ? parseInt(e.target.value) : undefined)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">ทุกคน</option>
+              {filteredUsers.map(user => (
+                <option key={user.ID} value={user.ID}>
+                  {user.nickname || `${user.first_name} ${user.last_name}`.trim()}
                 </option>
               ))}
             </select>
@@ -380,7 +592,7 @@ const DiscountSales: React.FC = () => {
                     </div>
                     <div className="ml-4">
                       <p className="text-sm font-medium text-gray-600">% ส่วนลดเฉลี่ย</p>
-                      <p className="text-2xl font-semibold text-gray-900">{avgDiscountPercentage.toFixed(2)}%</p>
+                      <p className="text-2xl font-semibold text-gray-900">{Math.round(avgDiscountPercentage)}%</p>
                     </div>
                   </div>
                 </div>
@@ -388,35 +600,32 @@ const DiscountSales: React.FC = () => {
 
               {/* Charts */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Pie Chart */}
+                {/* Left Bar Chart - Top 8 ส่วนลด (by amount) */}
                 <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">สัดส่วนส่วนลด</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Top 8 ส่วนลด (จำนวนเงิน)</h2>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pieChartData}
-                          cx="50%"
-                          cy="50%"
-                          labelLine={false}
-                          outerRadius={100}
-                          fill="#8884d8"
-                          dataKey="value"
-                          label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(1)}%`}
-                        >
-                          {pieChartData.map((_, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
+                      <BarChart data={discountChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="name" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          fontSize={12}
+                        />
+                        <YAxis />
                         <Tooltip content={<CustomTooltip />} />
-                      </PieChart>
+                        <Legend />
+                        <Bar dataKey="value" fill="#EF4444" name="ส่วนลด (฿)" />
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                {/* Bar Chart */}
+                {/* Right Bar Chart - Top 10 ส่วนลด (by percentage) */}
                 <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Top 10 ส่วนลด</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Top 10 ส่วนลด (เปอร์เซ็นต์)</h2>
                   <div className="h-80">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={barChartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
@@ -430,7 +639,8 @@ const DiscountSales: React.FC = () => {
                         />
                         <YAxis />
                         <Tooltip content={<CustomTooltip />} />
-                        <Bar dataKey="discount" fill="#FF8042" />
+                        <Legend />
+                        <Bar dataKey="percentage" fill="#FF8042" name="ส่วนลด (%)" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -439,15 +649,24 @@ const DiscountSales: React.FC = () => {
 
               {/* Data Table */}
               <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                   <h2 className="text-lg font-semibold text-gray-900">รายละเอียดส่วนลด</h2>
+                  <button
+                    onClick={exportToCSV}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export CSV
+                  </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Sales Name
+                          ชื่อเล่น
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Total Commission
@@ -471,7 +690,7 @@ const DiscountSales: React.FC = () => {
                         <tr key={item.sales_id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
-                              {item.sales_name}
+                              {item.nickname || item.sales_name}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
@@ -481,7 +700,7 @@ const DiscountSales: React.FC = () => {
                             ฿{formatCurrency(item.metrics.total_discount)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-orange-600">
-                            {item.metrics.discount_percentage.toFixed(2)}%
+                            {Math.round(item.metrics.discount_percentage)}%
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-center">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">

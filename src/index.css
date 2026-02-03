@@ -10,3 +10,29 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Custom Cursor */
+* {
+  cursor: url('https://peoplesparty.or.th/wp-content/uploads/2024/09/PEOPLES-PARTY_DESIGN-CONCEPT-09-1.svg') 12 12, auto !important;
+}
+
+/* Hover states for interactive elements */
+button, 
+a, 
+input[type="button"], 
+input[type="submit"], 
+input[type="reset"], 
+select,
+.cursor-pointer {
+  cursor: url('https://peoplesparty.or.th/wp-content/uploads/2024/09/PEOPLES-PARTY_DESIGN-CONCEPT-09-1.svg') 12 12, pointer !important;
+}
+
+/* Text input cursor */
+input[type="text"], 
+input[type="email"], 
+input[type="password"], 
+input[type="number"], 
+textarea,
+.cursor-text {
+  cursor: url('https://peoplesparty.or.th/wp-content/uploads/2024/09/PEOPLES-PARTY_DESIGN-CONCEPT-09-1.svg') 12 12, text !important;
+}

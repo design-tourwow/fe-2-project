@@ -4,24 +4,24 @@
   "description": "ระบบรายงานและวิเคราะห์ข้อมูล Tourwow",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#FF6600",
+  "background_color": "#ffffff",
+  "theme_color": "#0b69a3",
   "icons": [
     {
-      "src": "/favicon.svg",
+      "src": "https://peoplesparty.or.th/wp-content/uploads/2024/09/PEOPLES-PARTY_DESIGN-CONCEPT-09-1.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "/favicon.ico",
+      "src": "https://peoplesparty.or.th/wp-content/uploads/2024/09/PEOPLES-PARTY_DESIGN-CONCEPT-09-1.svg",
       "sizes": "32x32",
-      "type": "image/x-icon"
+      "type": "image/svg+xml"
     },
     {
-      "src": "/apple-touch-icon.png",
+      "src": "https://peoplesparty.or.th/wp-content/uploads/2024/09/PEOPLES-PARTY_DESIGN-CONCEPT-09-1.svg",
       "sizes": "180x180",
-      "type": "image/png"
+      "type": "image/svg+xml"
     }
   ]
 }

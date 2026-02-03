@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts'
-import { SupplierReportData, Country, FilterMode, FilterParams } from '../types/supplier'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend } from 'recharts'
+import { SupplierReportData, Country, FilterMode } from '../types/supplier'
+import { ExtendedFilterParams, Team, JobPosition, User } from '../types/filterTypes'
 import { supplierApiService } from '../services/supplierApi'
+import { filterApiService } from '../services/filterService'
 import { 
   formatCurrency, 
   getQuarterOptions, 
@@ -11,14 +13,16 @@ import {
   getCurrentQuarter
 } from '../utils/dateUtils'
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658', '#FF7C7C'];
-
-type SortField = 'avg_commission_per_pax' | 'avg_net_commission_per_pax'
+type SortField = 'total_commission' | 'total_net_commission' | 'total_pax' | 'avg_commission_per_pax' | 'avg_net_commission_per_pax'
 type SortDirection = 'asc' | 'desc'
 
 const SupplierCommission: React.FC = () => {
   const [data, setData] = useState<SupplierReportData[]>([])
   const [countries, setCountries] = useState<Country[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
+  const [jobPositions, setJobPositions] = useState<JobPosition[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -29,35 +33,75 @@ const SupplierCommission: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedCountry, setSelectedCountry] = useState<number | undefined>(undefined)
   
+  // New filter states
+  const [selectedJobPosition, setSelectedJobPosition] = useState<string | undefined>(undefined)
+  const [selectedTeam, setSelectedTeam] = useState<number | undefined>(undefined)
+  const [selectedUser, setSelectedUser] = useState<number | undefined>(undefined)
+  
   // Sorting states
   const [sortField, setSortField] = useState<SortField | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
-  // Load countries on mount
+  // Load countries and filter options on mount
   useEffect(() => {
-    const loadCountries = async () => {
+    const loadInitialData = async () => {
       try {
-        const countriesData = await supplierApiService.getCountries()
+        const [countriesData, teamsData, jobPositionsData, usersData] = await Promise.all([
+          supplierApiService.getCountries(),
+          filterApiService.getTeams(),
+          filterApiService.getJobPositions(),
+          filterApiService.getUsers()
+        ])
+        
         setCountries(countriesData)
+        setTeams(teamsData)
+        setJobPositions(jobPositionsData)
+        setUsers(usersData)
+        setFilteredUsers(usersData)
       } catch (err) {
-        console.error('Failed to load countries:', err)
+        console.error('Failed to load initial data:', err)
       }
     }
-    loadCountries()
+    loadInitialData()
   }, [])
+
+  // Update filtered users when team or job position changes
+  useEffect(() => {
+    let filtered = users
+
+    if (selectedTeam) {
+      filtered = filtered.filter(user => user.team_number === selectedTeam)
+    }
+
+    if (selectedJobPosition) {
+      filtered = filtered.filter(user => 
+        user.job_position.toLowerCase() === selectedJobPosition.toLowerCase()
+      )
+    }
+
+    setFilteredUsers(filtered)
+    
+    // Clear user selection if current user is not in filtered list
+    if (selectedUser && !filtered.find(user => user.ID === selectedUser)) {
+      setSelectedUser(undefined)
+    }
+  }, [selectedTeam, selectedJobPosition, users, selectedUser])
 
   // Load data when filters change
   useEffect(() => {
     loadReportData()
-  }, [filterMode, selectedYear, selectedQuarter, selectedMonth, selectedCountry])
+  }, [filterMode, selectedYear, selectedQuarter, selectedMonth, selectedCountry, selectedJobPosition, selectedTeam, selectedUser])
 
   const loadReportData = async () => {
     setLoading(true)
     setError(null)
     
     try {
-      const params: FilterParams = {
-        year: selectedYear
+      const params: ExtendedFilterParams = {}
+
+      // เพิ่ม year เฉพาะเมื่อไม่ใช่ 'all' mode
+      if (filterMode !== 'all' && selectedYear) {
+        params.year = selectedYear
       }
 
       // Only add country_id if it's actually selected (not undefined)
@@ -71,8 +115,22 @@ const SupplierCommission: React.FC = () => {
         params.month = selectedMonth
       }
 
-      console.log('API Params:', params) // Debug log
+      // Add new filter parameters
+      if (selectedJobPosition) {
+        params.job_position = selectedJobPosition
+      }
+      
+      if (selectedTeam) {
+        params.team_number = selectedTeam
+      }
+      
+      if (selectedUser) {
+        params.user_id = selectedUser
+      }
 
+      console.log('Supplier API Params:', params) // Debug log
+
+      // Call API with extended filter parameters
       const reportData = await supplierApiService.getSupplierReport(params)
       
       // Check if reportData exists and is an array
@@ -163,9 +221,10 @@ const SupplierCommission: React.FC = () => {
   const monthOptions = getMonthOptions()
 
   // Prepare chart data
-  const chartData = data.map(item => ({
-    name: item.supplier_name_th,
-    value: item.metrics.total_commission,
+  const chartData = data.slice(0, 10).map(item => ({
+    name: item.supplier_name_th.length > 15 ? item.supplier_name_th.substring(0, 15) + '...' : item.supplier_name_th,
+    totalCommission: item.metrics.total_commission,
+    netCommission: item.metrics.total_net_commission,
     fullName: `${item.supplier_name_th} (${item.supplier_name_en})`
   }))
 
@@ -176,12 +235,54 @@ const SupplierCommission: React.FC = () => {
         <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
           <p className="font-medium">{data.fullName}</p>
           <p className="text-blue-600">
-            ยอดคอม: ฿{formatCurrency(data.value)}
+            Total Comm: ฿{formatCurrency(data.totalCommission)}
+          </p>
+          <p className="text-green-600">
+            Net Comm: ฿{formatCurrency(data.netCommission)}
           </p>
         </div>
       )
     }
     return null
+  }
+
+  const exportToCSV = () => {
+    const headers = [
+      'Supplier Name (TH)',
+      'Supplier Name (EN)', 
+      'Total Commission',
+      'Net Commission',
+      'Total PAX',
+      'Avg Commission Per PAX',
+      'Avg Net Commission Per PAX'
+    ]
+    
+    const csvData = data.map(item => [
+      `"${item.supplier_name_th}"`,
+      `"${item.supplier_name_en}"`,
+      item.metrics.total_commission,
+      item.metrics.total_net_commission,
+      item.metrics.total_pax,
+      item.metrics.avg_commission_per_pax,
+      item.metrics.avg_net_commission_per_pax
+    ])
+    
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.join(','))
+    ].join('\n')
+    
+    // Add UTF-8 BOM for proper Thai character display in Excel
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', `supplier-commission-${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
   }
 
   return (
@@ -200,7 +301,7 @@ const SupplierCommission: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">ตัวกรอง</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-4">
           {/* Filter Mode */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -211,6 +312,7 @@ const SupplierCommission: React.FC = () => {
               onChange={(e) => handleFilterModeChange(e.target.value as FilterMode)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
+              <option value="all">ทั้งหมด</option>
               <option value="quarterly">รายไตรมาส</option>
               <option value="monthly">รายเดือน</option>
               <option value="yearly">รายปี</option>
@@ -297,6 +399,12 @@ const SupplierCommission: React.FC = () => {
             </div>
           )}
 
+          {filterMode === 'all' && (
+            <div className="col-span-1">
+              {/* Placeholder div เพื่อให้ layout สวย */}
+            </div>
+          )}
+
           {/* Country Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -311,6 +419,69 @@ const SupplierCommission: React.FC = () => {
               {countries.map(country => (
                 <option key={country.id} value={country.id}>
                   {country.name_th}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Job Position Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              👥 ตำแหน่งงาน
+            </label>
+            <select 
+              value={selectedJobPosition || ''}
+              onChange={(e) => {
+                setSelectedJobPosition(e.target.value || undefined)
+                setSelectedUser(undefined) // Clear user selection
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">ทุกตำแหน่ง</option>
+              {jobPositions.map(position => (
+                <option key={position.job_position} value={position.job_position}>
+                  {position.job_position}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Team Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              🏢 ทีม
+            </label>
+            <select 
+              value={selectedTeam || ''}
+              onChange={(e) => {
+                setSelectedTeam(e.target.value ? parseInt(e.target.value) : undefined)
+                setSelectedUser(undefined) // Clear user selection
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">ทุกทีม</option>
+              {teams.map(team => (
+                <option key={team.team_number} value={team.team_number}>
+                  Team {team.team_number}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* User Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              👤 ผู้ใช้
+            </label>
+            <select 
+              value={selectedUser || ''}
+              onChange={(e) => setSelectedUser(e.target.value ? parseInt(e.target.value) : undefined)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">ทุกคน</option>
+              {filteredUsers.map(user => (
+                <option key={user.ID} value={user.ID}>
+                  {user.nickname || `${user.first_name} ${user.last_name}`.trim()}
                 </option>
               ))}
             </select>
@@ -362,35 +533,41 @@ const SupplierCommission: React.FC = () => {
             <>
               {/* Chart */}
               <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">สัดส่วนยอดขาย</h2>
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Top 10 Supplier Commission</h2>
                 <div className="h-96">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={120}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }: any) => `${name} ${((percent || 0) * 100).toFixed(1)}%`}
-                      >
-                        {chartData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
+                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="name" 
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                        fontSize={12}
+                      />
+                      <YAxis />
                       <Tooltip content={<CustomTooltip />} />
                       <Legend />
-                    </PieChart>
+                      <Bar dataKey="totalCommission" fill="#3B82F6" name="Total Commission" />
+                      <Bar dataKey="netCommission" fill="#10B981" name="Net Commission" />
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
               {/* Data Table */}
               <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
+                <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                   <h2 className="text-lg font-semibold text-gray-900">รายละเอียด Supplier</h2>
+                  <button
+                    onClick={exportToCSV}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Export CSV
+                  </button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
@@ -400,13 +577,31 @@ const SupplierCommission: React.FC = () => {
                           Supplier Name
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Total Comm.
+                          <button
+                            onClick={() => handleSort('total_commission')}
+                            className="flex items-center justify-end w-full hover:text-gray-700 focus:outline-none"
+                          >
+                            Total Comm.
+                            {getSortIcon('total_commission')}
+                          </button>
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Net Comm.
+                          <button
+                            onClick={() => handleSort('total_net_commission')}
+                            className="flex items-center justify-end w-full hover:text-gray-700 focus:outline-none"
+                          >
+                            Net Comm.
+                            {getSortIcon('total_net_commission')}
+                          </button>
                         </th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          จำนวนผู้เดินทาง
+                          <button
+                            onClick={() => handleSort('total_pax')}
+                            className="flex items-center justify-center w-full hover:text-gray-700 focus:outline-none"
+                          >
+                            จำนวนผู้เดินทาง
+                            {getSortIcon('total_pax')}
+                          </button>
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           <button

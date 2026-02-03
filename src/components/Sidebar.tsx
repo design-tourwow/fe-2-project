@@ -54,27 +54,31 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       {/* Mobile Overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 lg:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-20"
           onClick={onClose}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Mobile Sidebar */}
       <div className={`
-        fixed lg:static inset-y-0 left-0 z-30
+        fixed inset-y-0 left-0 z-30
         w-64 bg-sidebar shadow-lg transform transition-transform duration-300 ease-in-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         {/* Logo/Brand */}
         <div className="p-6 border-b border-blue-600">
           <div className="flex items-center justify-between">
-            <div className="text-white text-xl font-bold">
-              Tourwow Report
+            <div className="flex items-center">
+              <img 
+                src="https://financebackoffice.tourwow.com/assets/images/tourwow-logo.png" 
+                alt="Tourwow Logo" 
+                className="h-8 w-auto"
+              />
             </div>
-            {/* Close button for mobile */}
+            {/* Close button */}
             <button
               onClick={onClose}
-              className="lg:hidden text-white hover:text-gray-300"
+              className="text-white hover:text-gray-300"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
