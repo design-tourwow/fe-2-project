@@ -11,39 +11,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const menuItems = [
     {
-      name: 'Dashboard',
-      path: '/',
+      name: 'Report Gap',
+      path: 'https://finance-backoffice-report.vercel.app/tour-image-manager',
+      isExternal: true,
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5a2 2 0 012-2h4a2 2 0 012 2v0a2 2 0 01-2 2H10a2 2 0 01-2-2v0z" />
-        </svg>
-      )
-    },
-    {
-      name: 'Supplier Commission',
-      path: '/supplier-commission',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-        </svg>
-      )
-    },
-    {
-      name: 'Discount Sales',
-      path: '/discount-sales',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-        </svg>
-      )
-    },
-    {
-      name: 'Order Discount',
-      path: '/request-discount',
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
         </svg>
       )
     }
@@ -62,25 +35,25 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       {/* Mobile Sidebar */}
       <div className={`
         fixed inset-y-0 left-0 z-30
-        w-64 bg-sidebar shadow-lg transform transition-transform duration-300 ease-in-out
+        w-48 bg-white shadow-lg transform transition-transform duration-300 ease-in-out border-r border-gray-200
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         {/* Logo/Brand */}
-        <div className="p-6 border-b border-blue-600">
+        <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
+            <div className="flex items-center justify-center flex-1">
               <img 
                 src="https://financebackoffice.tourwow.com/assets/images/tourwow-logo.png" 
                 alt="Tourwow Logo" 
-                className="h-8 w-auto"
+                className="h-8 w-auto max-w-full"
               />
             </div>
             {/* Close button */}
             <button
               onClick={onClose}
-              className="text-white hover:text-gray-300"
+              className="text-gray-500 hover:text-gray-700 ml-2"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -88,25 +61,45 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Navigation Menu */}
-        <nav className="mt-6">
-          <div className="px-4 space-y-2">
+        <nav className="mt-4">
+          <div className="px-3 space-y-1">
             {menuItems.map((item) => {
               const isActive = location.pathname === item.path
+              
+              if (item.isExternal) {
+                return (
+                  <a
+                    key={item.path}
+                    href={item.path}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={onClose}
+                    className="flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                  >
+                    {item.icon}
+                    <span className="ml-2">{item.name}</span>
+                    <svg className="w-3 h-3 ml-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                )
+              }
+              
               return (
                 <Link
                   key={item.path}
                   to={item.path}
                   onClick={onClose}
                   className={`
-                    flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors
+                    flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
                     ${isActive 
-                      ? 'bg-blue-700 text-white' 
-                      : 'text-blue-100 hover:bg-blue-600 hover:text-white'
+                      ? 'bg-blue-100 text-blue-700' 
+                      : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                     }
                   `}
                 >
                   {item.icon}
-                  <span className="ml-3">{item.name}</span>
+                  <span className="ml-2">{item.name}</span>
                 </Link>
               )
             })}
