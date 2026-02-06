@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
+interface MenuItem {
+  name: string
+  path?: string
+  isSubmenu?: boolean
+  icon: React.ReactNode
+  submenuItems?: SubMenuItem[]
+}
+
+interface SubMenuItem {
+  name: string
+  path: string
+  icon: React.ReactNode
+}
+
 interface TopBarProps {
   onMenuClick: () => void
 }
@@ -24,7 +38,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
     }
   }, [])
 
-  const menuItems = [
+  const menuItems: MenuItem[] = [
     {
       name: 'Dashboard',
       path: '/',
@@ -90,7 +104,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
     setOpenSubmenu(openSubmenu === submenuName ? null : submenuName)
   }
 
-  const isSubmenuActive = (submenuItems: any[]) => {
+  const isSubmenuActive = (submenuItems: SubMenuItem[]) => {
     return submenuItems.some(item => location.pathname === item.path)
   }
 
@@ -102,7 +116,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
           {/* Desktop Navigation */}
           <nav ref={navRef} className="hidden lg:flex space-x-1 relative">
             {menuItems.map((item) => {
-              if (item.isSubmenu) {
+              if (item.isSubmenu && item.submenuItems) {
                 const isActive = isSubmenuActive(item.submenuItems)
                 const isOpen = openSubmenu === item.name
                 
@@ -157,11 +171,11 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                   </div>
                 )
               } else {
-                const isActive = location.pathname === item.path
+                const isActive = item.path ? location.pathname === item.path : false
                 return (
                   <Link
-                    key={item.path}
-                    to={item.path}
+                    key={item.path || item.name}
+                    to={item.path || '/'}
                     className={`
                       flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors
                       ${isActive 
@@ -202,7 +216,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
       <div className="lg:hidden" style={{ backgroundColor: '#0b69a3' }}>
         <nav className="px-6 py-4 space-y-2">
           {menuItems.map((item) => {
-            if (item.isSubmenu) {
+            if (item.isSubmenu && item.submenuItems) {
               const isActive = isSubmenuActive(item.submenuItems)
               const isOpen = openSubmenu === item.name
               
@@ -257,11 +271,11 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                 </div>
               )
             } else {
-              const isActive = location.pathname === item.path
+              const isActive = item.path ? location.pathname === item.path : false
               return (
                 <Link
-                  key={item.path}
-                  to={item.path}
+                  key={item.path || item.name}
+                  to={item.path || '/'}
                   className={`
                     flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors
                     ${isActive 
