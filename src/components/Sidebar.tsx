@@ -1,5 +1,6 @@
 import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useNavigationLoading } from '../hooks/usePageLoading'
 
 interface SidebarProps {
   isOpen: boolean
@@ -8,6 +9,12 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation()
+  const { startNavigation } = useNavigationLoading()
+
+  const handleMenuClick = (menuName: string) => {
+    startNavigation(`กำลังโหลด ${menuName}...`)
+    onClose()
+  }
 
   const menuItems = [
     {
@@ -89,7 +96,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  onClick={onClose}
+                  onClick={() => handleMenuClick(item.name)}
                   className={`
                     flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors
                     ${isActive 

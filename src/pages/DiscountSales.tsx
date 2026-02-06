@@ -6,6 +6,7 @@ import { ExtendedFilterParams, Team, JobPosition, User } from '../types/filterTy
 import { discountSalesApiService } from '../services/discountSalesApi'
 import { supplierApiService } from '../services/supplierApi'
 import { filterApiService } from '../services/filterService'
+import { usePageLoading } from '../hooks/usePageLoading'
 import { 
   formatCurrency, 
   getQuarterOptions, 
@@ -30,6 +31,11 @@ const DiscountSales: React.FC = () => {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // ใช้ loading spinner เมื่อโหลดข้อมูล
+  usePageLoading(loading, {
+    loadingMessage: "กำลังโหลดข้อมูล Discount Sales..."
+  })
   
   // Filter states
   const [filterMode, setFilterMode] = useState<FilterMode>('quarterly')

@@ -4,6 +4,7 @@ import { OrderDiscountData, SalesSummary } from '../types/orderDiscount'
 import { Country, FilterMode } from '../types/supplier'
 import { orderDiscountApiService } from '../services/orderDiscountApi'
 import { supplierApiService } from '../services/supplierApi'
+import { usePageLoading } from '../hooks/usePageLoading'
 import { 
   formatCurrency, 
   getQuarterOptions, 
@@ -29,6 +30,11 @@ const RequestDiscount: React.FC = () => {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // ใช้ loading spinner เมื่อโหลดข้อมูล
+  usePageLoading(loading, {
+    loadingMessage: "กำลังโหลดข้อมูล Order Discount..."
+  })
   const [showDiscountOnly, setShowDiscountOnly] = useState(true) // Default เป็น true
   const [showUnpaidOnly, setShowUnpaidOnly] = useState(false) // Filter สำหรับ Order ที่ยังไม่ชำระเงิน
   

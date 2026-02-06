@@ -4,6 +4,7 @@ import { SupplierReportData, Country, FilterMode } from '../types/supplier'
 import { ExtendedFilterParams, Team, JobPosition, User } from '../types/filterTypes'
 import { supplierApiService } from '../services/supplierApi'
 import { filterApiService } from '../services/filterService'
+import { usePageLoading } from '../hooks/usePageLoading'
 import { 
   formatCurrency, 
   getQuarterOptions, 
@@ -27,6 +28,11 @@ const SupplierCommission: React.FC = () => {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // ใช้ loading spinner เมื่อโหลดข้อมูล
+  usePageLoading(loading, {
+    loadingMessage: "กำลังโหลดข้อมูล Supplier Commission..."
+  })
   
   // Filter states
   const [filterMode, setFilterMode] = useState<FilterMode>('quarterly')

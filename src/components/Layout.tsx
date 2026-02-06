@@ -1,7 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
+import LoadingSpinner from './LoadingSpinner'
+import { useLoading } from '../contexts/LoadingContext'
+import { useNavigationLoading } from '../hooks/usePageLoading'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -10,6 +13,13 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
+  const { isLoading, loadingMessage } = useLoading()
+  const { finishNavigation } = useNavigationLoading()
+
+  // Hide loading when route changes
+  useEffect(() => {
+    finishNavigation()
+  }, [location.pathname, finishNavigation])
 
   const handleMenuClick = () => {
     setSidebarOpen(!sidebarOpen)
@@ -34,6 +44,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <div className="flex h-screen bg-gray-100">
+      {/* Loading Spinner Overlay */}
+      {isLoading && <LoadingSpinner message={loadingMessage} />}
+      
       {/* Desktop Sidebar */}
       <div className="hidden lg:flex lg:flex-shrink-0">
         <div className="flex flex-col w-48">

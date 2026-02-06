@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { useNavigationLoading } from '../hooks/usePageLoading'
 
 interface MenuItem {
   name: string
@@ -23,6 +24,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
   const location = useLocation()
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null)
   const navRef = useRef<HTMLDivElement>(null)
+  const { startNavigation } = useNavigationLoading()
 
   // Close submenu when clicking outside
   useEffect(() => {
@@ -104,6 +106,10 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
     setOpenSubmenu(openSubmenu === submenuName ? null : submenuName)
   }
 
+  const handleMenuClick = (menuName: string) => {
+    startNavigation(`กำลังโหลด ${menuName}...`)
+  }
+
   const isSubmenuActive = (submenuItems: SubMenuItem[]) => {
     return submenuItems.some(item => location.pathname === item.path)
   }
@@ -152,7 +158,10 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                             <Link
                               key={subItem.path}
                               to={subItem.path}
-                              onClick={() => setOpenSubmenu(null)}
+                              onClick={() => {
+                                setOpenSubmenu(null)
+                                handleMenuClick(subItem.name)
+                              }}
                               className={`
                                 flex items-center px-4 py-3 text-sm font-medium transition-colors first:rounded-t-lg last:rounded-b-lg
                                 ${isSubActive 
@@ -176,6 +185,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                   <Link
                     key={item.path || item.name}
                     to={item.path || '/'}
+                    onClick={() => handleMenuClick(item.name)}
                     className={`
                       flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors
                       ${isActive 
@@ -252,7 +262,10 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                           <Link
                             key={subItem.path}
                             to={subItem.path}
-                            onClick={() => setOpenSubmenu(null)}
+                            onClick={() => {
+                              setOpenSubmenu(null)
+                              handleMenuClick(subItem.name)
+                            }}
                             className={`
                               flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors
                               ${isSubActive 
@@ -276,6 +289,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
                 <Link
                   key={item.path || item.name}
                   to={item.path || '/'}
+                  onClick={() => handleMenuClick(item.name)}
                   className={`
                     flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors
                     ${isActive 
