@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import SupplierCommission from './pages/SupplierCommission'
 import DiscountSales from './pages/DiscountSales'
 import RequestDiscount from './pages/RequestDiscount'
+import OrderExternalSummary from './pages/OrderExternalSummary'
 import AuthToken from './pages/AuthToken'
 import { LoadingProvider } from './contexts/LoadingContext'
 
@@ -23,6 +24,7 @@ function App() {
               <Route path="/supplier-commission" element={<SupplierCommission />} />
               <Route path="/discount-sales" element={<DiscountSales />} />
               <Route path="/request-discount" element={<RequestDiscount />} />
+              <Route path="/order-external-summary" element={<OrderExternalSummary />} />
             </Routes>
           </Layout>
         } />
