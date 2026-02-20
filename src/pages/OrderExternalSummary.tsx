@@ -113,8 +113,11 @@ const OrderExternalSummary: React.FC = () => {
       }
 
       console.log('Order External API Params:', params)
+      console.log('Calling API:', `https://be-2-report.vercel.app/api/reports/order-external-summary`)
 
       const reportData = await orderExternalApiService.getOrderExternalSummary(params)
+      
+      console.log('Order External API Response:', reportData)
       
       if (reportData && Array.isArray(reportData)) {
         setData(reportData)
@@ -122,6 +125,7 @@ const OrderExternalSummary: React.FC = () => {
         setData([])
       }
     } catch (err) {
+      console.error('Order External API Error:', err)
       setError('เกิดข้อผิดพลาดในการโหลดข้อมูล กรุณาลองใหม่อีกครั้ง')
       setData([])
       console.error('Failed to load order external data:', err)
