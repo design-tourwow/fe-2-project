@@ -7,4 +7,5 @@ export interface OrderExternalData {
   discount: number
   first_installment_paid: boolean
   paid_at: string
+  seller_nickname: string
 }

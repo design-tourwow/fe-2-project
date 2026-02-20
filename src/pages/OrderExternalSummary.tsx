@@ -154,7 +154,8 @@ const OrderExternalSummary: React.FC = () => {
       'ยอดสุทธิ (฿)',
       'ค่าคอมมิชชั่น (฿)',
       'ส่วนลด (฿)',
-      'วันที่ชำระเงิน'
+      'วันที่ชำระเงิน',
+      'เซลล์ที่ทำ Order'
     ]
 
     const csvRows = [
@@ -166,7 +167,8 @@ const OrderExternalSummary: React.FC = () => {
         formatCurrency(item.net_amount),
         formatCurrency(item.supplier_commission),
         formatCurrency(item.discount),
-        new Date(item.paid_at).toLocaleDateString('th-TH')
+        new Date(item.paid_at).toLocaleDateString('th-TH'),
+        `"${item.seller_nickname || '-'}"`
       ].join(','))
     ]
 
@@ -479,6 +481,9 @@ const OrderExternalSummary: React.FC = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           วันที่ชำระเงิน
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          เซลล์ที่ทำ Order
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -519,6 +524,11 @@ const OrderExternalSummary: React.FC = () => {
                                 month: 'short',
                                 day: 'numeric'
                               })}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {item.seller_nickname || '-'}
                             </div>
                           </td>
                         </tr>
