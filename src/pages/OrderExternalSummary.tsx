@@ -15,6 +15,14 @@ import {
   filterAndDisplayJobPositions
 } from '../utils/dateUtils'
 
+const formatDateTH = (dateString: string): string => {
+  const d = new Date(dateString)
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const year = d.getFullYear() + 543
+  return `${day}/${month}/${year}`
+}
+
 const OrderExternalSummary: React.FC = () => {
   const [data, setData] = useState<OrderExternalData[]>([])
   const [countries, setCountries] = useState<Country[]>([])
@@ -162,12 +170,12 @@ const OrderExternalSummary: React.FC = () => {
       headers.join(','),
       ...data.map(item => [
         `"${item.order_code}"`,
-        new Date(item.created_at).toLocaleDateString('th-TH'),
+        formatDateTH(item.created_at),
         `"${item.customer_name}"`,
         formatCurrency(item.net_amount),
         formatCurrency(item.supplier_commission),
         formatCurrency(item.discount),
-        new Date(item.paid_at).toLocaleDateString('th-TH'),
+        formatDateTH(item.paid_at),
         `"${item.seller_nickname || '-'}"`
       ].join(','))
     ]
@@ -496,11 +504,7 @@ const OrderExternalSummary: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {new Date(item.created_at).toLocaleDateString('th-TH', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
+                              {formatDateTH(item.created_at)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -519,11 +523,7 @@ const OrderExternalSummary: React.FC = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {new Date(item.paid_at).toLocaleDateString('th-TH', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric'
-                              })}
+                              {formatDateTH(item.paid_at)}
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">

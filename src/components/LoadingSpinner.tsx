@@ -18,16 +18,9 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   return (
     <div className="fixed inset-0 bg-white bg-opacity-90 flex items-center justify-center z-50">
       <div className="text-center">
-        {/* Spinning Logo */}
+        {/* Spinning Circle */}
         <div className="mb-6">
-          <img 
-            src="https://peoplesparty.or.th/wp-content/uploads/2024/09/PEOPLES-PARTY_DESIGN-CONCEPT-09-1.svg" 
-            alt="Loading..." 
-            className={`${sizeClasses[size]} mx-auto animate-spin`}
-            style={{
-              animation: 'spin 2s linear infinite'
-            }}
-          />
+          <div className={`${sizeClasses[size]} mx-auto border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin`} />
         </div>
         
         {/* Loading Message */}

@@ -4,15 +4,6 @@ const Dashboard: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="text-center">
-        {/* Logo */}
-        <div className="mb-8">
-          <img 
-            src="https://peoplesparty.or.th/wp-content/uploads/2024/09/PEOPLES-PARTY_DESIGN-CONCEPT-09-1.svg" 
-            alt="Tourwow Logo" 
-            className="h-32 w-auto mx-auto mb-6"
-          />
-        </div>
-        
         {/* Welcome Message */}
         <h1 className="text-4xl font-bold text-gray-800 mb-4">
           ยินดีต้อนรับเข้าสู่ระบบ
